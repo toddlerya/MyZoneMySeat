@@ -5,6 +5,7 @@
 # @FileName : hlju_lib_urls.py
 # @Project  : MyZoneMySeat
 
+index_url = "http://seat1.lib.hlju.edu.cn/login?targetUri=%2F"
 login_url = "http://seat1.lib.hlju.edu.cn/auth/signIn"
 captcha_url = 'http://seat1.lib.hlju.edu.cn/simpleCaptcha/captcha'
 booking_url_01 = "http://seat1.lib.hlju.edu.cn"

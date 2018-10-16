@@ -6,10 +6,8 @@
 # @Project  : MyZoneMySeat
 
 import requests
-from requests.cookies import RequestsCookieJar
-from bs4 import BeautifulSoup
-import json
-
+# from bs4 import BeautifulSoup
+from lxml import etree
 from hlju_lib_urls import *
 from sec import username, password
 
@@ -18,17 +16,33 @@ class HljuLibrarySeat(object):
 
     def __init__(self):
         self.s = requests.session()
-        img_resp = self.s.get(login_url)
-        if img_resp.status_code != 200:
-            print("[-] ERROR: 读取验证码失败, HTTP_STATUS_CODE: %d", img_resp.status_code)
+        index_resp = self.s.get(index_url)
+        if index_resp.status_code != 200:
+            print("[-] ERROR: 读取首页失败, HTTP_STATUS_CODE: %d", index_resp.status_code)
+
+        # 获取cookie
         ck_dict = requests.utils.dict_from_cookiejar(self.s.cookies)  # 将jar格式转为dict
         self.ck = 'JSESSIONID=' + ck_dict['JSESSIONID']  # 重组cookies
+
+        # 获取SYNCHRONIZER_TOKEN
+        index_html = index_resp.content
+        xpath_reg = '''//input[@id="SYNCHRONIZER_TOKEN"]/@value'''
+        root = etree.HTML(index_html)
+        self.token = root.xpath(xpath_reg)[0].text
+
         self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36",
-            'Content-Type': 'application/x-www-form-urlencoded',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Encoding': 'gzip, deflate',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8,zh-TW;q=0.7',
+            'Cache-Control': 'max-age=0',
+            'Connection': 'keep-alive',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Cookie': 'JSESSIONID=6205E7A25777643C6E3955A2173B37BA',
+            'DNT': '1',
+            'Origin': 'http://seat1.lib.hlju.edu.cn',
+            'Referer': 'http://seat1.lib.hlju.edu.cn/login?targetUri=%2F',
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36",
             # "Cookie": self.ck
-            "Cookie": 'JSESSIONID=6205E7A25777643C6E3955A2173B37BA',
         }
 
 
@@ -56,22 +70,28 @@ class HljuLibrarySeat(object):
 
     def login(self, username, password):
         post_data = {
-            'SYNCHRONIZER_TOKEN': '15a93751-2b74-41c5-bbd1-dfc35f02d148',
+            'SYNCHRONIZER_TOKEN': self.token,
             'SYNCHRONIZER_URI': '/login',
             'username': username,
             'password': password,
             'captcha': input("请输入验证码\n")
         }
-        resp = self.s.post(url=login_url, data=post_data, headers=self.headers)
+        resp = self.s.get(url=login_url, data=post_data, headers=self.headers, allow_redirects=False)
+        # resp = self.s.post(url=login_url, data=post_data, headers=self.headers)
         print(resp.headers)
-        # result = resp.content().decode('utf-8')
+        print(resp.url)
+        print(resp.status_code)
+        result = resp.content.decode('utf-8')
+        print("result--->", result)
+        root = etree.HTML(result)
+        title = root.xpath("//title")[0].text
         # soup = BeautifulSoup(result, "html.parser")
         # title = soup.title.text
         # print("title", title)
-        # if (title == "自选座位 :: 图书馆预约系统"):
-        #     return True
-        # else:
-        #     return False
+        if (title == "自选座位 :: 图书馆预约系统"):
+            return True
+        else:
+            return False
 
 if __name__ == '__main__':
 
