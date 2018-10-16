@@ -6,6 +6,7 @@
 # @Project  : MyZoneMySeat
 
 import requests
+import sys
 # from bs4 import BeautifulSoup
 from lxml import etree
 from hlju_lib_urls import *
@@ -19,16 +20,21 @@ class HljuLibrarySeat(object):
         index_resp = self.s.get(index_url)
         if index_resp.status_code != 200:
             print("[-] ERROR: 读取首页失败, HTTP_STATUS_CODE: %d", index_resp.status_code)
+        index_html = index_resp.content
+        if index_html.decode("utf-8") == '系统维护中，请稍候访问':
+            print('[-] WARN: 图书馆预约系统维护中, 暂时无法使用!')
+            sys.exit()
+
+        # 获取SYNCHRONIZER_TOKEN
+        xpath_reg = '''//input[@id="SYNCHRONIZER_TOKEN"]/@value'''
+        root = etree.HTML(index_html)
+        self.token = root.xpath(xpath_reg)[0].text
 
         # 获取cookie
         ck_dict = requests.utils.dict_from_cookiejar(self.s.cookies)  # 将jar格式转为dict
         self.ck = 'JSESSIONID=' + ck_dict['JSESSIONID']  # 重组cookies
 
-        # 获取SYNCHRONIZER_TOKEN
-        index_html = index_resp.content
-        xpath_reg = '''//input[@id="SYNCHRONIZER_TOKEN"]/@value'''
-        root = etree.HTML(index_html)
-        self.token = root.xpath(xpath_reg)[0].text
+
 
         self.headers = {
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
