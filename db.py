@@ -41,9 +41,9 @@ class SeatDB(object):
         '''
         pass
 
-    def query_sql(self, sql):
+    def query_sql(self, sql, *args):
         try:
-            self.cur.execute(sql)
+            self.cur.execute(sql, args)
         except Exception as err:
             print("[-] 执行查询SQL失败: {}".format(err))
         else:

@@ -12,6 +12,7 @@ import time
 from lxml import etree
 from hlju_lib_urls import *
 from sec import username, password
+from db import SeatDB
 
 
 class HljuLibrarySeat(object):
@@ -213,11 +214,16 @@ if __name__ == '__main__':
     stat_time = 420  # 420  ---> 7:00
     # 结束时间
     end_time = 1260  # 1260 ---> 22:00
+    # 预定房间名称
+    goal_room = '三楼原电阅室-预约'
     # 系统开放时间
     system_open_time = (18, 30)  # 18:30
     # ==================== 用户自定义配置 END ==========================
 
-    # 预定时长, 根据结束时间-开始时间计算
+    #  直接从数据库读取目标房间的座位信息, 按照ID从大到小排列, 暴力抢座
+    sd = SeatDB()
+    goal_seats = sd.query_sql("SELECT seat_id, seat_number FROM seat_info WHERE seat_room = ? ORDER BY seat_id DESC", goal_room)
+
     h = HljuLibrarySeat()
     if h.download_captcha():
         login_status, login_msg = h.login(username=username, password=password)
@@ -227,9 +233,12 @@ if __name__ == '__main__':
                 print('[-] ERROR: 获取预定token失败!')
                 sys.exit()
             wait_open(hour=system_open_time[0], minute=system_open_time[1])
-            if h.get_free_book_info():
-                for each_seat_id, each_seat_info in h.all_free_seat.items():
-                    h.book_seat(seat_id=each_seat_id, start=stat_time, end=end_time)
+            # if h.get_free_book_info():
+            #     for each_seat_id, each_seat_info in h.all_free_seat.items():
+            #         h.book_seat(seat_id=each_seat_id, start=stat_time, end=end_time)
+            for seat in goal_seats:  # 直接从数据库读取, 暴力抢座
+                seat_id = seat[0]
+                h.book_seat(seat_id=seat_id, start=stat_time, end=end_time)
             # 调试代码
             # h.book_seat('26631', '1260', '1320')
         else:
