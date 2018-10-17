@@ -8,6 +8,7 @@
 import requests
 import sys
 import datetime
+import time
 from lxml import etree
 from hlju_lib_urls import *
 from sec import username, password
@@ -140,7 +141,8 @@ class HljuLibrarySeat(object):
         root = etree.HTML(html)
         book_token_ele = root.xpath('//input[@name="SYNCHRONIZER_TOKEN"]')[0]
         self.book_token = book_token_ele.get('value')
-        print('book_token-===>', self.book_token)
+        # self.system_time = root.xpath('''//span[@id="currentTime"]''')[0].text
+        # print('system_time', self.system_time)
         if len(self.book_token) == 36:
             return True
         else:
@@ -179,6 +181,19 @@ class HljuLibrarySeat(object):
             print('预定失败, 继续尝试其他座位!')
 
 
+def wait_open(hour, minute):
+    __temp_time = time.ctime()
+    now_hour_min = __temp_time.split()[-2][0:-3].split(':')
+    _hour = int(now_hour_min[0])
+    _min = int(now_hour_min[1])
+    print('[*] 等待系统预定时间开放... 开放预定时间为 %d:%d' % (int(hour), int(minute)))
+    while True:
+        if _hour >= int(hour) and _min >= int(minute):
+            break
+        else:
+            time.sleep(0.5)
+
+
 if __name__ == '__main__':
     # ==================== 用户自定义配置 BEGIN =======================
     # ===================== 请根据需要修改时间配置======================
@@ -189,6 +204,8 @@ if __name__ == '__main__':
     stat_time = 420  # 420  ---> 7:00
     # 结束时间
     end_time = 1260  # 1260 ---> 21:00
+    # 系统开放时间
+    system_open_time = (16, 50)  # 18:30
     # ==================== 用户自定义配置 END ==========================
 
     # 预定时长, 根据结束时间-开始时间计算
@@ -202,6 +219,7 @@ if __name__ == '__main__':
             if not h.get_book_token():
                 print('[-] ERROR: 获取预定token失败!')
                 sys.exit()
+            wait_open(hour=system_open_time[0], minute=system_open_time[1])
             if h.get_free_book_info(book_hour):
                 for each_seat_id, each_seat_info in h.all_free_seat.items():
                     h.book_seat(seat_id=each_seat_id, start=stat_time, end=end_time)
