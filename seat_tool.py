@@ -116,7 +116,7 @@ class HljuLibrarySeat(object):
         # free_seat_reg = '''//ul[@class="item"]/li[@class="using"]'''
         root = etree.HTML(seat_str)
         seats_eles = root.xpath(free_seat_reg)
-        print('当前可选座位共: %s个\n' % seat_num)
+        print('[+] 当前可选座位共: %s个' % seat_num)
         for seat in seats_eles:
             raw_seat_id = seat.get('id')
             try:
