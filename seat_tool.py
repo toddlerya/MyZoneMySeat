@@ -88,27 +88,34 @@ class HljuLibrarySeat(object):
         else:
             return False, '登录失败'
 
-    def get_free_book_info(self, hour):
-        """
+    def get_free_book_info(self, hour='null', startMin='null', endMin='null', offset=0, power='null', window='null', timeout=5.0):
+        '''
         查询预定座位信息
-        :param hour: int
+        :param hour:
+        :param startMin:
+        :param endMin:
+        :param offset:
+        :param power:
+        :param window:
+        :param timeout:
         :return:
-        """
+        '''
         # 查询预定明天的座位信息
         self.all_free_seat = dict()
         free_book_form = {
             'onDate': self.tomorrow_date,
             'building': '1',  # 1-老馆
             'room': '28',  # 三楼原电阅室-预约
-            'hour': str(hour),  # 14h
-            'startMin': 'null',
-            'endMin': 'null',
-            'power': 'null',
-            'window': 'null'
+            'hour': hour,  # 14h
+            'startMin': startMin,
+            'endMin': endMin,
+            'power': power,
+            'window': window,
+            'offset': offset
         }
 
         print('[+] 开始查询空座...')
-        resp = self.s.post(url=free_book_query_url, data=free_book_form, headers=self.headers, timeout=10.0)
+        resp = self.s.get(url=free_book_query_url, data=free_book_form, headers=self.headers, timeout=timeout)
         seat_json = resp.json()
         seat_num = seat_json['seatNum']
         seat_str = seat_json['seatStr']
@@ -129,7 +136,7 @@ class HljuLibrarySeat(object):
             # print(seat_id, type(seat_id), seat_title, type(seat_title), seat_num, type(seat_num))
             self.all_free_seat[seat_id] = [seat_num, seat_title]
         free_seat_count = len(self.all_free_seat)
-        print('[+] 当前空闲座位共: %d个' % free_seat_count)  # {'32362': ['正在使用中', '005'], '27512': ['正在使用中', '016']}
+        print('[+] 当前空闲座位共: %d个' % free_seat_count)  # {'32362': ['005', '正在使用中'], '27512': ['016', '正在使用中']}
         if free_seat_count > 0:
             print('[+] 有可预约空座, 开始预约!')
             return True
@@ -205,13 +212,12 @@ if __name__ == '__main__':
     # 开始时间
     stat_time = 420  # 420  ---> 7:00
     # 结束时间
-    end_time = 1260  # 1260 ---> 21:00
+    end_time = 1260  # 1260 ---> 22:00
     # 系统开放时间
     system_open_time = (18, 30)  # 18:30
     # ==================== 用户自定义配置 END ==========================
 
     # 预定时长, 根据结束时间-开始时间计算
-    book_hour = int((end_time - stat_time) / 60)
     h = HljuLibrarySeat()
     if h.download_captcha():
         login_status, login_msg = h.login(username=username, password=password)
@@ -221,7 +227,7 @@ if __name__ == '__main__':
                 print('[-] ERROR: 获取预定token失败!')
                 sys.exit()
             wait_open(hour=system_open_time[0], minute=system_open_time[1])
-            if h.get_free_book_info(book_hour):
+            if h.get_free_book_info():
                 for each_seat_id, each_seat_info in h.all_free_seat.items():
                     h.book_seat(seat_id=each_seat_id, start=stat_time, end=end_time)
             # 调试代码
