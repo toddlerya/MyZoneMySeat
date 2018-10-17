@@ -236,9 +236,11 @@ if __name__ == '__main__':
             # if h.get_free_book_info():
             #     for each_seat_id, each_seat_info in h.all_free_seat.items():
             #         h.book_seat(seat_id=each_seat_id, start=stat_time, end=end_time)
-            for seat in goal_seats:  # 直接从数据库读取, 暴力抢座
-                seat_id = seat[0]
-                h.book_seat(seat_id=seat_id, start=stat_time, end=end_time)
+            for offset in range(0, 120, 15):  # 从起始时间开始, 每间隔15分钟尝试一次任务, 直到两个小时为止
+                for seat in goal_seats:
+                    seat_id = seat[0]
+                    h.book_seat(seat_id=seat_id, start=stat_time+offset, end=end_time)
+
             # 调试代码
             # h.book_seat('26631', '1260', '1320')
         else:
