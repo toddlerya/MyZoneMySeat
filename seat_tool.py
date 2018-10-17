@@ -108,7 +108,7 @@ class HljuLibrarySeat(object):
         }
 
         print('[+] 开始查询空座...')
-        resp = self.s.post(url=free_book_query_url, data=free_book_form, headers=self.headers)
+        resp = self.s.post(url=free_book_query_url, data=free_book_form, headers=self.headers, timeout=10.0)
         seat_json = resp.json()
         seat_num = seat_json['seatNum']
         seat_str = seat_json['seatStr']
@@ -151,16 +151,6 @@ class HljuLibrarySeat(object):
             return False
 
     def book_seat(self, seat_id, start, end):
-        # post_data = {
-        #     'SYNCHRONIZER_TOKEN': self.token,
-        #     'SYNCHRONIZER_URI': '/',
-        #     "seat": seat_id,
-        #     "date": self.tomorrow_date,
-        #     "start": start,  # 480 ---> 8:00
-        #     "end": end,  # 1320 ---> 22:00
-        #     'captcha': ''
-        # }
-
         post_data = {
             'SYNCHRONIZER_TOKEN': self.book_token,
             'SYNCHRONIZER_URI': '/',
@@ -169,7 +159,7 @@ class HljuLibrarySeat(object):
             "end": str(end)  # 1320 ---> 22:00
         }
         # print(post_data)
-        resp = self.s.post(url=book_seat_self_url, data=post_data, headers=self.headers)
+        resp = self.s.post(url=book_seat_self_url, data=post_data, headers=self.headers, timeout=10.0)
         if resp.status_code != 200:
             print('[-] ERROR 预定失败, 请求错误! HTTP_CODE: %d', resp.status_code)
         html = resp.content.decode("utf-8")
@@ -208,7 +198,7 @@ def wait_open(hour, minute):
 
 if __name__ == '__main__':
     # ==================== 用户自定义配置 BEGIN =======================
-    # ===================== 请根据需要修改时间配置======================
+    # 请根据需要修改时间配置
     # 开始结束时间，计算公式为24小时制时间乘以60，比如：
     #                8:00  转换为  8 x 60 = 480
     #                21:00 转换为 21 x 60 = 1260
@@ -222,7 +212,6 @@ if __name__ == '__main__':
 
     # 预定时长, 根据结束时间-开始时间计算
     book_hour = int((end_time - stat_time) / 60)
-
     h = HljuLibrarySeat()
     if h.download_captcha():
         login_status, login_msg = h.login(username=username, password=password)
@@ -235,7 +224,6 @@ if __name__ == '__main__':
             if h.get_free_book_info(book_hour):
                 for each_seat_id, each_seat_info in h.all_free_seat.items():
                     h.book_seat(seat_id=each_seat_id, start=stat_time, end=end_time)
-
             # 调试代码
             # h.book_seat('26631', '1260', '1320')
         else:
