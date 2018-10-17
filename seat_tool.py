@@ -23,7 +23,7 @@ class HljuLibrarySeat(object):
             print("[-] ERROR: 读取首页失败, HTTP_STATUS_CODE: %d", index_resp.status_code)
         index_html = index_resp.content
         if index_html.decode("utf-8") == '系统维护中，请稍候访问':
-            print('[-] WARN: 图书馆预约系统维护中, 暂时无法使用!')
+            print('[*] WARN: 图书馆预约系统维护中, 暂时无法使用!')
             sys.exit()
 
         # 获取SYNCHRONIZER_TOKEN
@@ -57,7 +57,7 @@ class HljuLibrarySeat(object):
                 out_img = open("captcha.jpg", "wb")
                 img_resp = self.s.get(captcha_url, headers=self.headers)
                 if img_resp.status_code != 200:
-                    print("ERROR: captcha_url http_code is %d" % img_resp.status_code)
+                    print("[-] ERROR: captcha_url http_code is %d" % img_resp.status_code)
                 img = img_resp.content
                 out_img.write(img)
                 out_img.flush()
@@ -65,7 +65,7 @@ class HljuLibrarySeat(object):
                 print("[+] 验证码保存成功, 请自行查看记录.")
                 is_down_ok = True
             else:
-                print('ERROR: captcha_url is NULL')
+                print('[-] ERROR: captcha_url is NULL')
         except Exception as err:
             print("[-] ERROR: save captcha error: %s", err)
             is_down_ok = False
@@ -77,7 +77,7 @@ class HljuLibrarySeat(object):
             'SYNCHRONIZER_URI': '/login',
             'username': username,
             'password': password,
-            'captcha': input('请查看captcha.jpg, 输入验证码\n')
+            'captcha': input('[+] 请查看captcha.jpg, 输入验证码\n')
         }
         resp = self.s.post(url=login_url, data=post_data, headers=self.headers)
         result = resp.content.decode('utf-8')
@@ -129,12 +129,12 @@ class HljuLibrarySeat(object):
             # print(seat_id, type(seat_id), seat_title, type(seat_title), seat_num, type(seat_num))
             self.all_free_seat[seat_id] = [seat_num, seat_title]
         free_seat_count = len(self.all_free_seat)
-        print('当前空闲座位共: %d个' % free_seat_count)  # {'32362': ['正在使用中', '005'], '27512': ['正在使用中', '016']}
+        print('[+] 当前空闲座位共: %d个' % free_seat_count)  # {'32362': ['正在使用中', '005'], '27512': ['正在使用中', '016']}
         if free_seat_count > 0:
-            print('有可预约空座, 开始预约!')
+            print('[+] 有可预约空座, 开始预约!')
             return True
         else:
-            print('无可预约空座, 早起吧骚年!')
+            print('[!] 无可预约空座, 早起吧骚年!')
             return False
 
     def get_book_token(self):
