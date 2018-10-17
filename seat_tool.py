@@ -7,6 +7,7 @@
 
 import requests
 import sys
+import datetime
 # from bs4 import BeautifulSoup
 from lxml import etree
 from hlju_lib_urls import *
@@ -87,12 +88,14 @@ class HljuLibrarySeat(object):
             return False, '登录失败'
 
     def get_free_book_info(self):
+        # 查询预定明天的座位信息
         self.all_free_seat = dict()
+        tomorrow_date = str(datetime.date.today() + datetime.timedelta(days=1))
         free_book_form = {
-            'onDate': '2018-10-17',
-            'building': '1', # 1-老馆
-            'room': '28', # 三楼原电阅室-预约
-            'hour': 'null',
+            'onDate': tomorrow_date,
+            'building': '1',  # 1-老馆
+            'room': '28',  # 三楼原电阅室-预约
+            'hour': '14',  # 14h
             'startMin': 'null',
             'endMin': 'null',
             'power': 'null',
@@ -118,8 +121,8 @@ class HljuLibrarySeat(object):
             seat_num = seat.xpath('dl/dt')[0].text
             # print(seat_id, type(seat_id), seat_title, type(seat_title), seat_num, type(seat_num))
             self.all_free_seat[seat_id] = [seat_num, seat_title]
-        print('当前空闲座位共: %d个' % len(self.all_free_seat))
-        # {'seat_32362': ['正在使用中', '005'], 'seat_27512': ['正在使用中', '016']}
+        print('当前空闲座位共: %d个' % len(
+            self.all_free_seat))  # {'seat_32362': ['正在使用中', '005'], 'seat_27512': ['正在使用中', '016']}
 
     def book_seat(self):
         for each_seat in self.all_free_seat:
