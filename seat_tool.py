@@ -8,7 +8,6 @@
 import requests
 import sys
 import datetime
-# from bs4 import BeautifulSoup
 from lxml import etree
 from hlju_lib_urls import *
 from sec import username, password
@@ -50,7 +49,6 @@ class HljuLibrarySeat(object):
         }
         self.tomorrow_date = str(datetime.date.today() + datetime.timedelta(days=1))
 
-
     def download_captcha(self):
         is_down_ok = False
         try:
@@ -78,7 +76,7 @@ class HljuLibrarySeat(object):
             'SYNCHRONIZER_URI': '/login',
             'username': username,
             'password': password,
-            'captcha': input('请输入验证码\n')
+            'captcha': input('请查看captcha.jpg, 输入验证码\n')
         }
         resp = self.s.post(url=login_url, data=post_data, headers=self.headers)
         result = resp.content.decode('utf-8')
@@ -89,14 +87,19 @@ class HljuLibrarySeat(object):
         else:
             return False, '登录失败'
 
-    def get_free_book_info(self):
+    def get_free_book_info(self, hour):
+        """
+        查询预定座位信息
+        :param hour: int
+        :return:
+        """
         # 查询预定明天的座位信息
         self.all_free_seat = dict()
         free_book_form = {
             'onDate': self.tomorrow_date,
             'building': '1',  # 1-老馆
             'room': '28',  # 三楼原电阅室-预约
-            'hour': '14',  # 14h
+            'hour': str(hour),  # 14h
             'startMin': 'null',
             'endMin': 'null',
             'power': 'null',
@@ -106,8 +109,8 @@ class HljuLibrarySeat(object):
         seat_json = resp.json()
         seat_num = seat_json['seatNum']
         seat_str = seat_json['seatStr']
-        # free_seat_reg = '''//ul[@class="item"]/li[@class="free"]'''
-        free_seat_reg = '''//ul[@class="item"]/li[@class="using"]'''
+        free_seat_reg = '''//ul[@class="item"]/li[@class="free"]'''
+        # free_seat_reg = '''//ul[@class="item"]/li[@class="using"]'''
         root = etree.HTML(seat_str)
         seats_eles = root.xpath(free_seat_reg)
         print('当前可选座位共: %s个\n' % seat_num)
@@ -143,7 +146,6 @@ class HljuLibrarySeat(object):
         else:
             return False
 
-
     def book_seat(self, seat_id, start, end):
         # post_data = {
         #     'SYNCHRONIZER_TOKEN': self.token,
@@ -159,8 +161,8 @@ class HljuLibrarySeat(object):
             'SYNCHRONIZER_TOKEN': self.book_token,
             'SYNCHRONIZER_URI': '/',
             "seat": seat_id,
-            "start": start,  # 480 ---> 8:00
-            "end": end  # 1320 ---> 22:00
+            "start": str(start),  # 480 ---> 8:00
+            "end": str(end)  # 1320 ---> 22:00
         }
         print(post_data)
         resp = self.s.post(url=book_seat_self_url, data=post_data, headers=self.headers)
@@ -170,75 +172,28 @@ class HljuLibrarySeat(object):
         # print(html)
         root = etree.HTML(html)
         book_status = root.xpath('''//div[@class="layoutSeat"]/dl/dt''')[0].text
-        print('book_sttus==>', book_status)
         if book_status == '系统已经为您预定好了':
             print('预定成功, 请登录系统查看预约信息!')
             sys.exit()
         else:
             print('预定失败, 继续尝试其他座位!')
 
-        # '''
-        # 布局选座 直接使用room_id唯一标注一个场馆某个楼层的某个房间,如信部分馆二楼东区,关于参数building(场馆)和floor(楼层)可以暂时不考虑
-        # '''
-        # def map_book(self,username,password,room_id,date,start_seat_id,end_seat_id,start_time,end_time):
-        #     #isLogin = self.login(username,password)
-        #     #if(isLogin):
-        #     #get请求 发送room_id和date
-        #     url1 = "http://seat.lib.whu.edu.cn/mapBook/getSeatsByRoom?room="+room_id+"&date="+date
-        #     response= urllib.request.urlopen(url1)
-        #     result = response.read().decode("utf-8")
-        #     soup = BeautifulSoup(result, "html.parser")
-        #     lis = soup.find_all("li")
-        #     isBooked = False
-        #     for li in lis:
-        #         if(li.a):
-        #             #座位id范围
-        #             seat_num = li.a.text
-        #             if(start_seat_id <= int(seat_num) <= end_seat_id):
-        #                 #这里获得到每一个座位id
-        #                 seat_id = li["id"].split("_")[1]
-        #                 post_data = {
-        #                     "seat":seat_id,
-        #                     "date":date,
-        #                     "start":start_time,
-        #                     "end":end_time
-        #                 }
-        #                 headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.12; rv:50.0) Gecko/20100101 Firefox/50.0"}
-        #                 #post请求 请求内容为date和座位id
-        #                 url2 = "http://seat.lib.whu.edu.cn/selfRes"
-        #                 post_data = urllib.parse.urlencode(post_data).encode("utf-8")
-        #                 request = urllib.request.Request(url2, post_data, headers)
-        #                 response = urllib.request.urlopen(request)
-        #                 result = response.read().decode("utf-8")
-        #                 if("预约失败" in result):
-        #                     print("Booking Failed. Date "+date+", Seat No."+seat_num+", room "+room_id+".")
-        #                     isBooked = False
-        #                 else:
-        #                     isBooked = True
-        #                     print("Booking Success! Date "+date+", Seat No."+seat_num+", room "+room_id+".\n")
-        #                     os._exit()
-        #                     break
-        #     return isBooked
-        #
-        #
-        # def randomSeatNum(self,start,end):
-        #     return random.randint(start,end)
-        #
-        # #根据room_id获得当前room中seat_no的边界
-        # def getSeatIdBoundary(self,room_id):
-        #     url_get_seats_by_room = "http://seat.lib.whu.edu.cn/mapBook/getSeatsByRoom?room=" + room_id
-        #     response = urllib.request.urlopen(url_get_seats_by_room)
-        #     result = response.read().decode("utf-8")
-        #     soup = BeautifulSoup(result, "html.parser")
-        #     lis = soup.find_all("li")
-        #     count = 0
-        #     for li in lis:
-        #         if (li.a):
-        #             count += 1
-        #     return count
-
 
 if __name__ == '__main__':
+    # ==================== 用户自定义配置 BEGIN =======================
+    # ===================== 请根据需要修改时间配置======================
+    # 开始结束时间，计算公式为24小时制时间乘以60，比如：
+    #                8:00  转换为  8 x 60 = 480
+    #                21:00 转换为 21 x 60 = 1260
+    # 开始时间
+    stat_time = 420  # 420  ---> 7:00
+    # 结束时间
+    end_time = 1260  # 1260 ---> 21:00
+    # ==================== 用户自定义配置 END ==========================
+
+    # 预定时长, 根据结束时间-开始时间计算
+    book_hour = int((end_time - stat_time) / 60)
+
     h = HljuLibrarySeat()
     if h.download_captcha():
         login_status, login_msg = h.login(username=username, password=password)
@@ -247,11 +202,9 @@ if __name__ == '__main__':
             if not h.get_book_token():
                 print('[-] ERROR: 获取预定token失败!')
                 sys.exit()
-            if h.get_free_book_info():
+            if h.get_free_book_info(book_hour):
                 for each_seat_id, each_seat_info in h.all_free_seat.items():
-                    # "start": '480',  # 480 ---> 8:00
-                    # "end": '1320',  # 1320 ---> 22:00
-                    h.book_seat(seat_id=each_seat_id, start='480', end='1320')
+                    h.book_seat(seat_id=each_seat_id, start=stat_time, end=end_time)
             # h.book_seat('28217', '1260', '1320')
         else:
             print('[-] ERROR: 请检查是否可以正常访问登录页面, 以及验证是否输入正确!')
