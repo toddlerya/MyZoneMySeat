@@ -48,6 +48,8 @@ class HljuLibrarySeat(object):
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36",
             "Cookie": self.ck
         }
+        self.tomorrow_date = str(datetime.date.today() + datetime.timedelta(days=1))
+
 
     def download_captcha(self):
         is_down_ok = False
@@ -90,9 +92,8 @@ class HljuLibrarySeat(object):
     def get_free_book_info(self):
         # 查询预定明天的座位信息
         self.all_free_seat = dict()
-        tomorrow_date = str(datetime.date.today() + datetime.timedelta(days=1))
         free_book_form = {
-            'onDate': tomorrow_date,
+            'onDate': self.tomorrow_date,
             'building': '1',  # 1-老馆
             'room': '28',  # 三楼原电阅室-预约
             'hour': '14',  # 14h
@@ -121,18 +122,60 @@ class HljuLibrarySeat(object):
             seat_num = seat.xpath('dl/dt')[0].text
             # print(seat_id, type(seat_id), seat_title, type(seat_title), seat_num, type(seat_num))
             self.all_free_seat[seat_id] = [seat_num, seat_title]
-        print('当前空闲座位共: %d个' % len(
-            self.all_free_seat))  # {'seat_32362': ['正在使用中', '005'], 'seat_27512': ['正在使用中', '016']}
+        free_seat_count = len(self.all_free_seat)
+        print('当前空闲座位共: %d个' % free_seat_count)  # {'32362': ['正在使用中', '005'], '27512': ['正在使用中', '016']}
+        if free_seat_count > 0:
+            print('有可预约空座, 开始预约!')
+            return True
+        else:
+            print('无可预约空座, 早起吧骚年!')
+            return False
 
-    def book_seat(self):
-        for each_seat in self.all_free_seat:
-            pass
+    def get_book_token(self):
+        resp = self.s.get(booking_url_01)
+        html = resp.content.decode('utf-8')
+        root = etree.HTML(html)
+        book_token_ele = root.xpath('//input[@name="SYNCHRONIZER_TOKEN"]')[0]
+        self.book_token = book_token_ele.get('value')
+        print('book_token-===>', self.book_token)
+        if len(self.book_token) == 36:
+            return True
+        else:
+            return False
+
+
+    def book_seat(self, seat_id, start, end):
         # post_data = {
+        #     'SYNCHRONIZER_TOKEN': self.token,
+        #     'SYNCHRONIZER_URI': '/',
         #     "seat": seat_id,
-        #     "date": date,
-        #     "start": start_time,
-        #     "end": end_time
+        #     "date": self.tomorrow_date,
+        #     "start": start,  # 480 ---> 8:00
+        #     "end": end,  # 1320 ---> 22:00
+        #     'captcha': ''
         # }
+
+        post_data = {
+            'SYNCHRONIZER_TOKEN': self.book_token,
+            'SYNCHRONIZER_URI': '/',
+            "seat": seat_id,
+            "start": start,  # 480 ---> 8:00
+            "end": end  # 1320 ---> 22:00
+        }
+        print(post_data)
+        resp = self.s.post(url=book_seat_self_url, data=post_data, headers=self.headers)
+        if resp.status_code != 200:
+            print('[-] ERROR 预定失败, 请求错误! HTTP_CODE: %d', resp.status_code)
+        html = resp.content.decode("utf-8")
+        # print(html)
+        root = etree.HTML(html)
+        book_status = root.xpath('''//div[@class="layoutSeat"]/dl/dt''')[0].text
+        print('book_sttus==>', book_status)
+        if book_status == '系统已经为您预定好了':
+            print('预定成功, 请登录系统查看预约信息!')
+            sys.exit()
+        else:
+            print('预定失败, 继续尝试其他座位!')
 
         # '''
         # 布局选座 直接使用room_id唯一标注一个场馆某个楼层的某个房间,如信部分馆二楼东区,关于参数building(场馆)和floor(楼层)可以暂时不考虑
@@ -201,7 +244,15 @@ if __name__ == '__main__':
         login_status, login_msg = h.login(username=username, password=password)
         if login_status:
             print('[+] 登录成功!')
-            h.get_free_book_info()
+            if not h.get_book_token():
+                print('[-] ERROR: 获取预定token失败!')
+                sys.exit()
+            if h.get_free_book_info():
+                for each_seat_id, each_seat_info in h.all_free_seat.items():
+                    # "start": '480',  # 480 ---> 8:00
+                    # "end": '1320',  # 1320 ---> 22:00
+                    h.book_seat(seat_id=each_seat_id, start='480', end='1320')
+            # h.book_seat('28217', '1260', '1320')
         else:
             print('[-] ERROR: 请检查是否可以正常访问登录页面, 以及验证是否输入正确!')
     else:

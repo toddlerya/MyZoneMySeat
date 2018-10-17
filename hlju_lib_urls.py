@@ -9,7 +9,11 @@ index_url = "http://seat1.lib.hlju.edu.cn/login?targetUri=%2F"
 login_url = "http://seat1.lib.hlju.edu.cn/auth/signIn"
 captcha_url = 'http://seat1.lib.hlju.edu.cn/simpleCaptcha/captcha'
 
+# 查询空座
 free_book_query_url = 'http://seat1.lib.hlju.edu.cn/freeBook/ajaxSearch'
+
+# 预约座位
+book_seat_self_url = 'http://seat1.lib.hlju.edu.cn/selfRes'
 
 booking_url_01 = "http://seat1.lib.hlju.edu.cn"
 # 布局选座模式
