@@ -8,6 +8,9 @@
 index_url = "http://seat1.lib.hlju.edu.cn/login?targetUri=%2F"
 login_url = "http://seat1.lib.hlju.edu.cn/auth/signIn"
 captcha_url = 'http://seat1.lib.hlju.edu.cn/simpleCaptcha/captcha'
+
+free_book_query_url = 'http://seat1.lib.hlju.edu.cn/freeBook/ajaxSearch'
+
 booking_url_01 = "http://seat1.lib.hlju.edu.cn"
 # 布局选座模式
 booking_url_02 = "http://seat1.lib.hlju.edu.cn/map"
