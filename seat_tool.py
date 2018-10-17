@@ -106,6 +106,8 @@ class HljuLibrarySeat(object):
             'power': 'null',
             'window': 'null'
         }
+
+        print('[+] 开始查询空座...')
         resp = self.s.post(url=free_book_query_url, data=free_book_form, headers=self.headers)
         seat_json = resp.json()
         seat_num = seat_json['seatNum']
@@ -166,29 +168,39 @@ class HljuLibrarySeat(object):
             "start": str(start),  # 480 ---> 8:00
             "end": str(end)  # 1320 ---> 22:00
         }
-        print(post_data)
+        # print(post_data)
         resp = self.s.post(url=book_seat_self_url, data=post_data, headers=self.headers)
         if resp.status_code != 200:
             print('[-] ERROR 预定失败, 请求错误! HTTP_CODE: %d', resp.status_code)
         html = resp.content.decode("utf-8")
         # print(html)
         root = etree.HTML(html)
-        book_status = root.xpath('''//div[@class="layoutSeat"]/dl/dt''')[0].text
-        if book_status == '系统已经为您预定好了':
-            print('预定成功, 请登录系统查看预约信息!')
-            sys.exit()
+        try:
+            temp_book_status = root.xpath('''//div[@class="layoutSeat"]/dl''')
+            book_status = temp_book_status[0][0].text
+        except Exception as err:
+            print('[-] ERROR 获取预定信息错误 ERROR_MSG: %s' % err)
         else:
-            print('预定失败, 继续尝试其他座位!')
+            if book_status == '系统已经为您预定好了':
+                print('预定成功, 请登录系统查看预约信息!')
+                sys.exit()
+            else:
+                fail_msg = temp_book_status[0].xpath('//span/text()[last()]')[-1]
+                if fail_msg == '已有1个有效预约，请在使用结束后再次进行选择':
+                    print('[*] 预定失败: %s' % fail_msg)
+                    sys.exit()
+                else:
+                    print('[-] ERROR 预定失败: %s, 继续尝试其他座位!' % fail_msg)
 
 
 def wait_open(hour, minute):
-    __temp_time = time.ctime()
-    now_hour_min = __temp_time.split()[-2][0:-3].split(':')
-    _hour = int(now_hour_min[0])
-    _min = int(now_hour_min[1])
-    print('[*] 等待系统预定时间开放... 开放预定时间为 %d:%d' % (int(hour), int(minute)))
+    print('[+] 等待系统预定时间开放... 开放预定时间为 %d:%d' % (int(hour), int(minute)))
     while True:
-        if _hour >= int(hour) and _min >= int(minute):
+        __temp_time = time.ctime()
+        now_hour_min = "".join(__temp_time.split()[-2][0:-3].split(':'))
+        now_time = int(now_hour_min)
+        if now_time >= int(''.join([str(hour), str(minute)])):
+            print('[+] 时间到我们开始抢座位!')
             break
         else:
             time.sleep(0.5)
@@ -205,7 +217,7 @@ if __name__ == '__main__':
     # 结束时间
     end_time = 1260  # 1260 ---> 21:00
     # 系统开放时间
-    system_open_time = (16, 50)  # 18:30
+    system_open_time = (16, 54)  # 18:30
     # ==================== 用户自定义配置 END ==========================
 
     # 预定时长, 根据结束时间-开始时间计算
@@ -223,7 +235,9 @@ if __name__ == '__main__':
             if h.get_free_book_info(book_hour):
                 for each_seat_id, each_seat_info in h.all_free_seat.items():
                     h.book_seat(seat_id=each_seat_id, start=stat_time, end=end_time)
-            # h.book_seat('28217', '1260', '1320')
+
+            # 调试代码
+            # h.book_seat('26631', '1260', '1320')
         else:
             print('[-] ERROR: 请检查是否可以正常访问登录页面, 以及验证是否输入正确!')
     else:
