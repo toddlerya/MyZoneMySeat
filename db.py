@@ -61,4 +61,8 @@ class SeatDB(object):
 
 if __name__ == '__main__':
     sd = SeatDB()
-    print(sd.query_sql("SELECT count(1) FROM seat_info WHERE seat_room = '三楼原电阅室-预约' ORDER BY seat_id DESC"))
+    print('总计爬取%d座位' % sd.query_sql("SELECT count(1) FROM seat_info")[0][0])
+    # print('三楼原电阅室-预约', sd.query_sql("SELECT count(1) FROM seat_info WHERE seat_room = '三楼原电阅室-预约'"))
+    ss = sd.query_sql("SELECT count(seat_id) as sn, seat_room FROM seat_info GROUP BY seat_room ORDER BY sn DESC")
+    for s in ss:
+        print(s)
