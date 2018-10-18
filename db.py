@@ -60,4 +60,5 @@ class SeatDB(object):
 
 
 if __name__ == '__main__':
-    pass
+    sd = SeatDB()
+    print(sd.query_sql("SELECT count(1) FROM seat_info WHERE seat_room = '三楼原电阅室-预约' ORDER BY seat_id DESC"))
