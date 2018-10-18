@@ -99,7 +99,7 @@ class HljuLibrarySeat(object):
         seat_page = seat_json['offset']
         if seat_count == 0:
             return False, seat_dict
-        free_seat_reg = '''//ul[@class="item"]/li[@class="free"]'''
+        free_seat_reg = '''//ul[@class="item"]/li'''
         root = etree.HTML(seat_str)
         seats_eles = root.xpath(free_seat_reg)
         for seat in seats_eles:

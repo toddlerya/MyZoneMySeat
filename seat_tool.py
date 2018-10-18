@@ -32,6 +32,8 @@ class HljuLibrarySeat(object):
         root = etree.HTML(index_html)
         self.token = root.xpath(xpath_reg)[0]
 
+        self.book_token = ''
+
         # 获取cookie
         ck_dict = requests.utils.dict_from_cookiejar(self.s.cookies)  # 将jar格式转为dict
         self.ck = 'JSESSIONID=' + ck_dict['JSESSIONID']  # 重组cookies
@@ -72,44 +74,45 @@ class HljuLibrarySeat(object):
             is_down_ok = False
         return is_down_ok
 
-    def login(self, username, password):
+    def login(self, user_name, pass_word):
         post_data = {
             'SYNCHRONIZER_TOKEN': self.token,
             'SYNCHRONIZER_URI': '/login',
-            'username': username,
-            'password': password,
+            'username': user_name,
+            'password': pass_word,
             'captcha': input('[+] 请查看captcha.jpg, 输入验证码\n')
         }
         resp = self.s.post(url=login_url, data=post_data, headers=self.headers)
         result = resp.content.decode('utf-8')
         root = etree.HTML(result)
         title = root.xpath("//title")[0].text
-        if (title == '自选座位 :: 图书馆空间预约系统'):
+        if title == '自选座位 :: 图书馆空间预约系统':
             return True, '登录成功'
         else:
             return False, '登录失败'
 
-    def get_free_book_info(self, hour='null', startMin='null', endMin='null', offset=0, power='null', window='null', timeout=5.0):
-        '''
+    def get_free_book_info(self, hour='null', start_min='null', end_min='null', offset=0, power='null', window='null',
+                           timeout=5.0):
+        """
         查询预定座位信息
         :param hour:
-        :param startMin:
-        :param endMin:
+        :param start_min:
+        :param end_min:
         :param offset:
         :param power:
         :param window:
         :param timeout:
         :return:
-        '''
+        """
         # 查询预定明天的座位信息
-        self.all_free_seat = dict()
+        all_free_seat = dict()
         free_book_form = {
             'onDate': self.tomorrow_date,
             'building': '1',  # 1-老馆
             'room': '28',  # 三楼原电阅室-预约
             'hour': hour,  # 14h
-            'startMin': startMin,
-            'endMin': endMin,
+            'startMin': start_min,
+            'endMin': end_min,
             'power': power,
             'window': window,
             'offset': offset
@@ -125,25 +128,24 @@ class HljuLibrarySeat(object):
         root = etree.HTML(seat_str)
         seats_eles = root.xpath(free_seat_reg)
         print('[+] 当前可选座位共: %s个' % seat_num)
-        for seat in seats_eles:
-            raw_seat_id = seat.get('id')
+        for __seat in seats_eles:
+            raw_seat_id = __seat.get('id')
             try:
-                seat_id = raw_seat_id.split('_')[1]
+                _seat_id = raw_seat_id.split('_')[1]
             except Exception as err:
                 print('[-] ERROR: 分割座位ID错误, MSG: %s', err)
                 sys.exit()
-            seat_title = seat.get('title')
-            seat_num = seat.xpath('dl/dt')[0].text
-            # print(seat_id, type(seat_id), seat_title, type(seat_title), seat_num, type(seat_num))
-            self.all_free_seat[seat_id] = [seat_num, seat_title]
-        free_seat_count = len(self.all_free_seat)
+            seat_title = __seat.get('title')
+            seat_num = __seat.xpath('dl/dt')[0].text
+            all_free_seat[_seat_id] = [seat_num, seat_title]
+        free_seat_count = len(all_free_seat)
         print('[+] 当前空闲座位共: %d个' % free_seat_count)  # {'32362': ['005', '正在使用中'], '27512': ['016', '正在使用中']}
         if free_seat_count > 0:
             print('[+] 有可预约空座, 开始预约!')
-            return True
+            return True, all_free_seat
         else:
             print('[!] 无可预约空座, 早起吧骚年!')
-            return False
+            return False, all_free_seat
 
     def get_book_token(self):
         resp = self.s.get(booking_url_01)
@@ -151,8 +153,6 @@ class HljuLibrarySeat(object):
         root = etree.HTML(html)
         book_token_ele = root.xpath('//input[@name="SYNCHRONIZER_TOKEN"]')[0]
         self.book_token = book_token_ele.get('value')
-        # self.system_time = root.xpath('''//span[@id="currentTime"]''')[0].text
-        # print('system_time', self.system_time)
         if len(self.book_token) == 36:
             return True
         else:
@@ -166,12 +166,10 @@ class HljuLibrarySeat(object):
             "start": str(start),  # 480 ---> 8:00
             "end": str(end)  # 1320 ---> 22:00
         }
-        # print(post_data)
-        resp = self.s.post(url=book_seat_self_url, data=post_data, headers=self.headers, timeout=10.0)
+        resp = self.s.post(url=book_seat_self_url, data=post_data, headers=self.headers, timeout=30.0)
         if resp.status_code != 200:
             print('[-] ERROR 预定失败, 请求错误! HTTP_CODE: %d', resp.status_code)
         html = resp.content.decode("utf-8")
-        # print(html)
         root = etree.HTML(html)
         try:
             temp_book_status = root.xpath('''//div[@class="layoutSeat"]/dl''')
@@ -186,7 +184,6 @@ class HljuLibrarySeat(object):
                 fail_msg = temp_book_status[0].xpath('//span/text()[last()]')[-1]
                 if fail_msg == '已有1个有效预约，请在使用结束后再次进行选择':
                     print('[*] 预定失败: %s' % fail_msg)
-                    sys.exit()
                 else:
                     print('[-] ERROR 预定失败: %s, 继续尝试其他座位!' % fail_msg)
 
@@ -211,36 +208,40 @@ if __name__ == '__main__':
     #                8:00  转换为  8 x 60 = 480
     #                21:00 转换为 21 x 60 = 1260
     # 开始时间
-    stat_time = 420  # 420  ---> 7:00
+    start_time = 420  # 420  ---> 7:00
     # 结束时间
     end_time = 1260  # 1260 ---> 22:00
     # 预定房间名称
-    goal_room = '三楼原电阅室-预约'
+    # goal_room = '三楼原电阅室-预约'
     # 系统开放时间
     system_open_time = (18, 30)  # 18:30
     # ==================== 用户自定义配置 END ==========================
 
     #  直接从数据库读取目标房间的座位信息, 按照ID从大到小排列, 暴力抢座
     sd = SeatDB()
-    goal_seats = sd.query_sql("SELECT seat_id, seat_number FROM seat_info WHERE seat_room = ? ORDER BY seat_id DESC", goal_room)
+    # goal_seats = sd.query_sql("SELECT seat_id, seat_number FROM seat_info WHERE seat_room = ? ORDER BY seat_id DESC", goal_room)
+    goal_seats = sd.query_sql("SELECT seat_id, seat_number FROM seat_info ORDER BY seat_id DESC")
 
     h = HljuLibrarySeat()
     if h.download_captcha():
-        login_status, login_msg = h.login(username=username, password=password)
+        login_status, login_msg = h.login(user_name=username, pass_word=password)
         if login_status:
             print('[+] 登录成功!')
-            if not h.get_book_token():
-                print('[-] ERROR: 获取预定token失败!')
-                sys.exit()
             wait_open(hour=system_open_time[0], minute=system_open_time[1])
-            # if h.get_free_book_info():
-            #     for each_seat_id, each_seat_info in h.all_free_seat.items():
+            # get_free_flag, free_seats = h.get_free_book_info()
+            # if get_free_flag:
+            #     for each_seat_id, each_seat_info in free_seats.items():
             #         h.book_seat(seat_id=each_seat_id, start=stat_time, end=end_time)
-            for offset in range(0, 120, 15):  # 从起始时间开始, 每间隔15分钟尝试一次任务, 直到两个小时为止
+            for offset_num in range(0, 120, 15):  # 从起始时间开始, 每间隔15分钟尝试一次任务, 直到两个小时为止
                 for seat in goal_seats:
-                    seat_id = seat[0]
-                    h.book_seat(seat_id=seat_id, start=stat_time+offset, end=end_time)
-
+                    start_time += offset_num
+                    print('[+] 当前预定起始时间为: %d' % (start_time / 60))
+                    seat_id_code: int = seat[0]
+                    # 每次提交预定信息前要先访问一次"自助选座"获取"预定token", 否则会出现非法Invalid CSRF token错误
+                    if not h.get_book_token():
+                        print('[-] ERROR: 获取预定token失败!')
+                    h.book_seat(seat_id=seat_id_code, start=start_time, end=end_time)
+                    # time.sleep(0.5)
             # 调试代码
             # h.book_seat('26631', '1260', '1320')
         else:
