@@ -10,7 +10,7 @@ import sys
 import datetime
 import time
 from lxml import etree
-from hlju_lib_urls import *
+from hlju_lib_config import *
 from sec import username, password
 from db import SeatDB
 

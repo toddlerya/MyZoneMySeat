@@ -10,7 +10,7 @@ import requests
 import sys
 import datetime
 from lxml import etree
-from hlju_lib_urls import *
+from hlju_lib_config import *
 from sec import username, password
 from db import SeatDB
 
@@ -116,6 +116,24 @@ class HljuLibrarySeat(object):
             seat_dict[seat_id] = [seat_num, seat_desc]
         return True, seat_dict
 
+    def get_seat_by_room(self, room_id):
+        seat_dict = dict()
+        resp = self.s.get(url=room_seat_map_url + '?room={N}'.format(N=room_id), headers=self.headers)
+        html = resp.content
+        root = etree.HTML(html)
+        seat_eles = root.xpath('''//ul/li[starts-with(@id, "seat_")]''')
+        for seat in seat_eles:
+            raw_seat_id = seat.get('id')
+            try:
+                seat_id = raw_seat_id.split('_')[1]
+            except Exception as err:
+                print('[-] ERROR: 分割座位ID错误, MSG: %s', err)
+                sys.exit()
+            seat_num = seat.xpath('''a''')[0].text
+            seat_desc = room_desc_dict[room_id]
+            seat_dict[seat_id] = [seat_num, seat_desc]
+        return True, seat_dict
+
 
 if __name__ == '__main__':
     sd = SeatDB()
@@ -127,12 +145,20 @@ if __name__ == '__main__':
         if login_status:
             print('[+] 登录成功!')
             print('[+] 开始爬取所有座位信息...')
-            flag = True
+            # flag = True
+            # all_seat_data = list()
+            # for offset in range(100):
+            #     if flag:
+            #         flag, seat_info_dict = h.get_seat_info(offset=offset)
+            #         for seat_id, seat_info in seat_info_dict.items():
+            #             temp_data = [seat_id, seat_info[0], seat_info[1]]
+            #             all_seat_data.append(temp_data)
+            # sd.load_seat_info(all_seat_data)
+            # ============= 采用第二种办法获取所有座位信息 =================
             all_seat_data = list()
-            for offset in range(100):
-                if flag:
-                    flag, seat_info_dict = h.get_seat_info(offset=offset)
-                    for seat_id, seat_info in seat_info_dict.items():
+            for room in room_desc_dict:
+                flag, seat_info_dict = h.get_seat_by_room(room_id=room)
+                for seat_id, seat_info in seat_info_dict.items():
                         temp_data = [seat_id, seat_info[0], seat_info[1]]
                         all_seat_data.append(temp_data)
             sd.load_seat_info(all_seat_data)
