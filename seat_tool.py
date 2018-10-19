@@ -11,6 +11,7 @@ import datetime
 import time
 from lxml import etree
 from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from hlju_lib_config import *
 from sec import username, password
 from db import SeatDB
@@ -18,12 +19,29 @@ from db import SeatDB
 
 class HljuLibrarySeat(object):
 
-    def __init__(self, retry_number):
+    def __init__(self, retries=10, backoff_factor=0.1, status_forcelist=[500, 502, 503, 504]):
         self.s = requests.session()
         # 重试访问, 应对服务器崩溃的情况
         # https://stackoverflow.com/questions/15431044/can-i-set-max-retries-for-requests-request
-        self.s.mount('http://', adapter=HTTPAdapter(max_retries=retry_number))
-        self.s.mount('https://', adapter=HTTPAdapter(max_retries=retry_number))
+        # https://urllib3.readthedocs.io/en/latest/reference/urllib3.util.html
+        # backoff_factor
+        # A backoff factor to apply between attempts after the second try (most errors are resolved immediately
+        # by a second try without a delay). urllib3 will sleep for:
+        # {backoff factor} * (2 ^ ({number of total retries} - 1))
+        # seconds. If the backoff_factor is 0.1, then sleep() will sleep for [0.0s, 0.2s, 0.4s, …] between retries.
+        # It will never be longer than Retry.BACKOFF_MAX.
+        # By default, backoff is disabled (set to 0).
+
+        retry = Retry(
+            total=retries,
+            read=retries,
+            connect=retries,
+            backoff_factor=backoff_factor,
+            status_forcelist=status_forcelist,
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        self.s.mount('http://', adapter=adapter)
+        self.s.mount('https://', adapter=adapter)
         index_resp = self.s.get(index_url)
         if index_resp.status_code != 200:
             print("[-] ERROR: 读取首页失败, HTTP_STATUS_CODE: %d", index_resp.status_code)
@@ -226,7 +244,13 @@ if __name__ == '__main__':
     # 系统开放时间
     system_open_time = (18, 30)  # 18:30
     # 网络访问失败重试次数, 应对渣服务器
-    max_retries = 1000
+    # urllib3 will sleep for:
+    # {backoff factor} * (2 ^ ({number of total retries} - 1)) seconds.
+    # If the backoff_factor is 0.1, then sleep() will sleep for [0.0s, 0.2s, 0.4s, …] between retries.
+    # It will never be longer than Retry.BACKOFF_MAX
+    max_retries = 11
+    backoff_factor = 1
+    # 1 * 2 ** 10 / 60 = 17 min
     # ==================== 用户自定义配置 END ==========================
 
     #  直接从数据库读取目标房间的座位信息, 按照ID从大到小排列, 暴力抢座
@@ -234,7 +258,7 @@ if __name__ == '__main__':
     goal_seats = sd.query_sql("SELECT seat_id, seat_number FROM seat_info WHERE seat_room = ? ORDER BY seat_id DESC", goal_room)
     # goal_seats = sd.query_sql("SELECT seat_id, seat_number FROM seat_info ORDER BY seat_id DESC")
 
-    h = HljuLibrarySeat(retry_number=max_retries)
+    h = HljuLibrarySeat(retries=max_retries, backoff_factor=backoff_factor, status_forcelist=[500, 502, 503, 504])
     if h.download_captcha():
         login_status, login_msg = h.login(user_name=username, pass_word=password)
         if login_status:
