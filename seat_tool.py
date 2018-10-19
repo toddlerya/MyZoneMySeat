@@ -181,10 +181,19 @@ class HljuLibrarySeat(object):
         else:
             return False
 
-    def book_seat(self, seat_id, start, end):
+    def book_seat(self, seat_id: str, start, end, date=str(datetime.date.today())):
+        """
+        提交预定座位表单
+        :param seat_id: 座位ID
+        :param start: 使用开始时间
+        :param end:  使用结束时间
+        :param date: 预定日期, 默认为当日
+        :return: 无返回值, 预定成功则终止程序
+        """
         post_data = {
             'SYNCHRONIZER_TOKEN': self.book_token,
             'SYNCHRONIZER_URI': '/',
+            'date': date,
             "seat": seat_id,
             "start": str(start),  # 480 ---> 8:00
             "end": str(end)  # 1320 ---> 22:00
@@ -206,9 +215,9 @@ class HljuLibrarySeat(object):
             else:
                 fail_msg = temp_book_status[0].xpath('//span/text()[last()]')[-1]
                 if fail_msg == '已有1个有效预约，请在使用结束后再次进行选择':
-                    print('[*] 预定失败: %s' % fail_msg)
+                    print('[*] 预定失败: {{ %s }}' % fail_msg)
                 else:
-                    print('[-] ERROR 预定失败: %s, 继续尝试其他座位!' % fail_msg)
+                    print('[-] ERROR 预定失败: {{ %s }}, 继续尝试其他座位!' % fail_msg)
 
     def wait_open(self, hour, minute):
         print('[+] 等待系统预定时间开放... 开放预定时间为 %d:%d' % (int(hour), int(minute)))
@@ -238,7 +247,7 @@ if __name__ == '__main__':
     # 开始时间
     start_time = 420  # 420  ---> 7:00
     # 结束时间
-    end_time = 1260  # 1260 ---> 22:00
+    end_time = 1320  # 1320 ---> 22:00
     # 预定房间名称
     goal_room = '三楼原电阅室-预约'
     # 系统开放时间
@@ -255,8 +264,8 @@ if __name__ == '__main__':
 
     #  直接从数据库读取目标房间的座位信息, 按照ID从大到小排列, 暴力抢座
     sd = SeatDB()
-    goal_seats = sd.query_sql("SELECT seat_id, seat_number FROM seat_info WHERE seat_room = ? ORDER BY seat_id DESC", goal_room)
-    # goal_seats = sd.query_sql("SELECT seat_id, seat_number FROM seat_info ORDER BY seat_id DESC")
+    # goal_seats = sd.query_sql("SELECT seat_id, seat_number FROM seat_info WHERE seat_room = ? ORDER BY seat_id DESC", goal_room)
+    goal_seats = sd.query_sql("SELECT seat_id, seat_number, seat_room FROM seat_info ORDER BY seat_id DESC")
 
     h = HljuLibrarySeat(retries=max_retries, backoff_factor=backoff_factor, status_forcelist=[500, 502, 503, 504])
     if h.download_captcha():
@@ -264,22 +273,29 @@ if __name__ == '__main__':
         if login_status:
             print('[+] 登录成功!')
             h.wait_open(hour=system_open_time[0], minute=system_open_time[1])
+            # ======================= 查询空座, 然后订座, 会卡爆 =========================
             # get_free_flag, free_seats = h.get_free_book_info()
             # if get_free_flag:
             #     for each_seat_id, each_seat_info in free_seats.items():
             #         h.book_seat(seat_id=each_seat_id, start=stat_time, end=end_time)
+            # ======================= 根据数据库的座位, 直接下单, 直到成功为止 ==========================
             for offset_num in range(0, 120, 15):  # 从起始时间开始, 每间隔15分钟尝试一次任务, 直到两个小时为止
                 for seat in goal_seats:
                     start_time += offset_num
                     print('[+] 当前预定起始时间为: %d' % (start_time / 60))
-                    seat_id_code: int = seat[0]
+                    seat_id_code: str = seat[0]
+                    seat_num: str = seat[1]
+                    seat_room: str = seat[2]
                     # 每次提交预定信息前要先访问一次"自助选座"获取"预定token", 否则会出现非法Invalid CSRF token错误
                     if not h.get_book_token():
                         print('[-] ERROR: 获取预定token失败!')
-                    h.book_seat(seat_id=seat_id_code, start=start_time, end=end_time)
-                    # time.sleep(0.5)
-            # 调试代码
-            # h.book_seat('26631', '1260', '1320')
+                    print("[+] 当前预定目标为: {0}-->{1}".format(seat_room, seat_num))
+                    h.book_seat(seat_id=seat_id_code, start=start_time, end=end_time, date=h.tomorrow_date)
+            # ====================== 调试代码 ==============================
+            # 每次提交预定信息前要先访问一次"自助选座"获取"预定token", 否则会出现非法Invalid CSRF token错误
+            # if not h.get_book_token():
+            #     print('[-] ERROR: 获取预定token失败!')
+            # h.book_seat('21409', '1260', '1320')
         else:
             print('[-] ERROR: 请检查是否可以正常访问登录页面, 以及验证是否输入正确!')
     else:
