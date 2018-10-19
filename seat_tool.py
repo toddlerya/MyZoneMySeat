@@ -148,7 +148,7 @@ class HljuLibrarySeat(object):
             return False, all_free_seat
 
     def get_book_token(self):
-        resp = self.s.get(booking_url_01)
+        resp = self.s.get(url=booking_url_01, headers=self.headers, timeout=10.0)
         html = resp.content.decode('utf-8')
         root = etree.HTML(html)
         book_token_ele = root.xpath('//input[@name="SYNCHRONIZER_TOKEN"]')[0]
@@ -212,15 +212,15 @@ if __name__ == '__main__':
     # 结束时间
     end_time = 1260  # 1260 ---> 22:00
     # 预定房间名称
-    # goal_room = '三楼原电阅室-预约'
+    goal_room = '三楼原电阅室-预约'
     # 系统开放时间
     system_open_time = (18, 30)  # 18:30
     # ==================== 用户自定义配置 END ==========================
 
     #  直接从数据库读取目标房间的座位信息, 按照ID从大到小排列, 暴力抢座
     sd = SeatDB()
-    # goal_seats = sd.query_sql("SELECT seat_id, seat_number FROM seat_info WHERE seat_room = ? ORDER BY seat_id DESC", goal_room)
-    goal_seats = sd.query_sql("SELECT seat_id, seat_number FROM seat_info ORDER BY seat_id DESC")
+    goal_seats = sd.query_sql("SELECT seat_id, seat_number FROM seat_info WHERE seat_room = ? ORDER BY seat_id DESC", goal_room)
+    # goal_seats = sd.query_sql("SELECT seat_id, seat_number FROM seat_info ORDER BY seat_id DESC")
 
     h = HljuLibrarySeat()
     if h.download_captcha():
