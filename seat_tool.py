@@ -187,18 +187,23 @@ class HljuLibrarySeat(object):
                 else:
                     print('[-] ERROR 预定失败: %s, 继续尝试其他座位!' % fail_msg)
 
-
-def wait_open(hour, minute):
-    print('[+] 等待系统预定时间开放... 开放预定时间为 %d:%d' % (int(hour), int(minute)))
-    while True:
-        __temp_time = time.ctime()
-        now_hour_min = "".join(__temp_time.split()[-2][0:-3].split(':'))
-        now_time = int(now_hour_min)
-        if now_time >= int(''.join([str(hour), str(minute)])):
-            print('[+] 时间到我们开始抢座位!')
-            break
-        else:
-            time.sleep(0.5)
+    def wait_open(self, hour, minute):
+        print('[+] 等待系统预定时间开放... 开放预定时间为 %d:%d' % (int(hour), int(minute)))
+        open_time_int = int(''.join([str(hour), str(minute)]))
+        while True:
+            __temp_time = time.ctime()
+            now_hour_min = "".join(__temp_time.split()[-2][0:-3].split(':'))
+            now_time = int(now_hour_min)
+            if now_time >= open_time_int:
+                print('[+] 时间到我们开始抢座位!')
+                break
+            elif now_time <= open_time_int - 3:
+                resp = self.s.get(url=booking_url_01, headers=self.headers, timeout=10.0)
+                if resp.status_code == 200:
+                    print("[+] 等待中, 确认存活...")
+                time.sleep(20)
+            else:
+                time.sleep(0.5)
 
 
 if __name__ == '__main__':
@@ -227,7 +232,7 @@ if __name__ == '__main__':
         login_status, login_msg = h.login(user_name=username, pass_word=password)
         if login_status:
             print('[+] 登录成功!')
-            wait_open(hour=system_open_time[0], minute=system_open_time[1])
+            h.wait_open(hour=system_open_time[0], minute=system_open_time[1])
             # get_free_flag, free_seats = h.get_free_book_info()
             # if get_free_flag:
             #     for each_seat_id, each_seat_info in free_seats.items():
