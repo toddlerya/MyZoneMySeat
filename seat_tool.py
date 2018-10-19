@@ -10,6 +10,7 @@ import sys
 import datetime
 import time
 from lxml import etree
+from requests.adapters import HTTPAdapter
 from hlju_lib_config import *
 from sec import username, password
 from db import SeatDB
@@ -17,8 +18,12 @@ from db import SeatDB
 
 class HljuLibrarySeat(object):
 
-    def __init__(self):
+    def __init__(self, retry_number):
         self.s = requests.session()
+        # 重试访问, 应对服务器崩溃的情况
+        # https://stackoverflow.com/questions/15431044/can-i-set-max-retries-for-requests-request
+        self.s.mount('http://', adapter=HTTPAdapter(max_retries=retry_number))
+        self.s.mount('https://', adapter=HTTPAdapter(max_retries=retry_number))
         index_resp = self.s.get(index_url)
         if index_resp.status_code != 200:
             print("[-] ERROR: 读取首页失败, HTTP_STATUS_CODE: %d", index_resp.status_code)
@@ -220,6 +225,8 @@ if __name__ == '__main__':
     goal_room = '三楼原电阅室-预约'
     # 系统开放时间
     system_open_time = (18, 30)  # 18:30
+    # 网络访问失败重试次数, 应对渣服务器
+    max_retries = 1000
     # ==================== 用户自定义配置 END ==========================
 
     #  直接从数据库读取目标房间的座位信息, 按照ID从大到小排列, 暴力抢座
@@ -227,7 +234,7 @@ if __name__ == '__main__':
     goal_seats = sd.query_sql("SELECT seat_id, seat_number FROM seat_info WHERE seat_room = ? ORDER BY seat_id DESC", goal_room)
     # goal_seats = sd.query_sql("SELECT seat_id, seat_number FROM seat_info ORDER BY seat_id DESC")
 
-    h = HljuLibrarySeat()
+    h = HljuLibrarySeat(retry_number=max_retries)
     if h.download_captcha():
         login_status, login_msg = h.login(user_name=username, pass_word=password)
         if login_status:
