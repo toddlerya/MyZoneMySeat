@@ -5,6 +5,7 @@
 # @FileName : verify_captcha.py
 # @Project  : MyZoneMySeat
 
+import sys
 import requests
 import pytesseract
 from PIL import Image
@@ -186,11 +187,13 @@ def download_captcha():
             if img_resp.status_code != 200:
                 print("[-] ERROR: captcha_url http_code is %d" % img_resp.status_code)
             img = img_resp.content
+            if img == '系统维护中，请稍候访问':
+                print('[-] 系统维护中，请稍候访问!')
+                sys.exit()
             out_img.write(img)
             out_img.flush()
             out_img.close()
             print("[+] 验证码保存成功, 请自行查看记录.")
-            is_down_ok = True
         else:
             print('[-] ERROR: captcha_url is NULL')
     except Exception as err:
@@ -198,6 +201,6 @@ def download_captcha():
 
 
 if __name__ == '__main__':
-    # download_captcha()
+    download_captcha()
     img = 'captcha.jpg'
     print(verify(img))
