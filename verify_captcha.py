@@ -9,7 +9,7 @@ import requests
 import pytesseract
 from PIL import Image
 from collections import defaultdict
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 # https://blog.csdn.net/gzlaiyonghao/article/details/1852726
 # https://blog.csdn.net/akak714/article/details/50324505
