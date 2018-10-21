@@ -187,7 +187,7 @@ def download_captcha():
             if img_resp.status_code != 200:
                 print("[-] ERROR: captcha_url http_code is %d" % img_resp.status_code)
             img = img_resp.content
-            if img == '系统维护中，请稍候访问':
+            if img.decode('utf-8') == '系统维护中，请稍候访问':
                 print('[-] 系统维护中，请稍候访问!')
                 sys.exit()
             out_img.write(img)
