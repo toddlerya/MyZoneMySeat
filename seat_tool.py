@@ -6,6 +6,7 @@
 # @Project  : MyZoneMySeat
 
 import requests
+import os
 import sys
 import datetime
 import time
@@ -17,11 +18,13 @@ from hlju_lib_config import *
 from sec import username, password
 from verify_captcha import verify
 from db import SeatDB
+from base_lib import Logger, my_log_file
 
 
 class HljuLibrarySeat(object):
 
     def __init__(self, retries=10, backoff_factor=0.1, status_forcelist=[500, 502, 503, 504]):
+        self.log = Logger(log_name=my_log_file(__file__), level=log_level, fmt='%(asctime)s - [line:%(lineno)d] - %(levelname)s: %(message)s')
         self.s = requests.session()
         # 重试访问, 应对服务器崩溃的情况
         # https://stackoverflow.com/questions/15431044/can-i-set-max-retries-for-requests-request
@@ -46,10 +49,10 @@ class HljuLibrarySeat(object):
         self.s.mount('https://', adapter=adapter)
         index_resp = self.s.get(index_url)
         if index_resp.status_code != 200:
-            print("[-] ERROR: 读取首页失败, HTTP_STATUS_CODE: %d", index_resp.status_code)
+            self.log.logger.error("读取首页失败, HTTP_STATUS_CODE: %d", index_resp.status_code)
         index_html = index_resp.content
         if index_html.decode("utf-8") == '系统维护中，请稍候访问':
-            print('[*] WARN: 图书馆预约系统维护中, 暂时无法使用!')
+            self.log.logger.warning("图书馆预约系统维护中, 暂时无法使用!")
             sys.exit()
 
         # 获取SYNCHRONIZER_TOKEN
@@ -85,21 +88,20 @@ class HljuLibrarySeat(object):
                 out_img = open("captcha.jpg", "wb")
                 img_resp = self.s.get(captcha_url, headers=self.headers)
                 if img_resp.status_code != 200:
-                    print("[-] ERROR: captcha_url http_code is %d" % img_resp.status_code)
+                    self.log.logger.error("captcha_url http_code is %d" % img_resp.status_code)
                 img = img_resp.content
                 if img == '系统维护中，请稍候访问':
-                    print('[-] 系统维护中，请稍候访问!')
+                    self.log.logger.warning("系统维护中，请稍候访问!")
                     sys.exit()
                 out_img.write(img)
                 out_img.flush()
                 out_img.close()
-                # print("[+] 验证码保存成功, 请自行查看记录.")
-                print("[+] 验证码保存成功.")
+                self.log.logger.info("验证码保存成功.")
                 is_down_ok = True
             else:
-                print('[-] ERROR: captcha_url is NULL')
+                self.log.logger.error("captcha_url is NULL")
         except Exception as err:
-            print("[-] ERROR: save captcha error: %s", err)
+            self.log.logger.error("save captcha error: %s", err)
             is_down_ok = False
         return is_down_ok
 
@@ -189,39 +191,40 @@ class HljuLibrarySeat(object):
         }
         resp = self.s.post(url=book_seat_self_url, data=post_data, headers=self.headers, timeout=30.0)
         if resp.status_code != 200:
-            print('[-] ERROR 预定失败, 请求错误! HTTP_CODE: %d', resp.status_code)
+            self.log.logger.error('预定失败, 请求错误! HTTP_CODE: %d', resp.status_code)
         html = resp.content.decode("utf-8")
         root = etree.HTML(html)
         try:
             temp_book_status = root.xpath('''//div[@class="layoutSeat"]/dl''')
             book_status = temp_book_status[0][0].text
         except Exception as err:
-            print('[-] ERROR 获取预定信息错误 ERROR_MSG: %s' % err)
+            self.log.logger.error('获取预定信息错误 ERROR_MSG: %s' % err)
         else:
             if book_status == '系统已经为您预定好了':
-                print('预定成功, 请登录系统查看预约信息!')
+                self.log.logger.info('预定成功, 请登录系统查看预约信息!')
                 sys.exit()
             else:
                 fail_msg = temp_book_status[0].xpath('//span/text()[last()]')[-1]
                 if fail_msg == '已有1个有效预约，请在使用结束后再次进行选择':
-                    print('[*] 预定失败: {{ %s }}' % fail_msg)
+                    self.log.logger.error('预定失败: {{ %s }}' % fail_msg)
+                    sys.exit()
                 else:
-                    print('[-] ERROR 预定失败: {{ %s }}, 继续尝试其他座位!' % fail_msg)
+                    self.log.logger.error('预定失败: {{ %s }}, 继续尝试其他座位!' % fail_msg)
 
     def wait_open(self, hour, minute):
-        print('[+] 等待系统预定时间开放... 开放预定时间为 %d:%d' % (int(hour), int(minute)))
+        self.log.logger.info('等待系统预定时间开放... 开放预定时间为 %d:%d' % (int(hour), int(minute)))
         open_time_int = int(''.join([str(hour), str(minute)]))
         while True:
             __temp_time = time.ctime()
             now_hour_min = "".join(__temp_time.split()[-2][0:-3].split(':'))
             now_time = int(now_hour_min)
             if now_time >= open_time_int:
-                print('[+] 时间到我们开始抢座位!')
+                self.log.logger.info('时间到我们开始抢座位!')
                 break
             elif now_time <= open_time_int - 3:
                 resp = self.s.get(url=booking_url_01, headers=self.headers, timeout=10.0)
                 if resp.status_code == 200:
-                    print("[+] 等待中, 确认存活...")
+                    self.log.logger.info('等待中, 确认存活...')
                 time.sleep(20)
             else:
                 time.sleep(0.5)
@@ -237,10 +240,10 @@ def captcha_verify(session_obj, threshold: int=100):
         # # 获取新cookie
         index_resp = session_obj.s.get(index_url)
         if index_resp.status_code != 200:
-            print("[-] ERROR: 读取首页失败, HTTP_STATUS_CODE: %d", index_resp.status_code)
+            session_obj.log.logger.error('读取首页失败, HTTP_STATUS_CODE: %d', index_resp.status_code)
         index_html = index_resp.content
         if index_html.decode("utf-8") == '系统维护中，请稍候访问':
-            print('[*] WARN: 图书馆预约系统维护中, 暂时无法使用!')
+            session_obj.log.logger.warning('图书馆预约系统维护中, 暂时无法使用!')
             sys.exit()
 
         # 获取SYNCHRONIZER_TOKEN
@@ -262,13 +265,11 @@ def captcha_verify(session_obj, threshold: int=100):
             'DNT': '1',
             'Origin': 'http://seat1.lib.hlju.edu.cn',
             'Referer': 'http://seat1.lib.hlju.edu.cn/login?targetUri=%2F',
-            # "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36",
             "User-Agent": choice(agents),
             "Cookie": session_obj.ck
         }
 
         if (session_obj.download_captcha()):
-            # print("now cookies===>", session_obj.ck, 'now_agent==>', session_obj.headers["User-Agent"])
             flag, res_captcha = verify('captcha.jpg')
             if flag:
                 return True, res_captcha
@@ -276,7 +277,7 @@ def captcha_verify(session_obj, threshold: int=100):
                 # 清空cookies, 下载新验证码
                 session_obj.s.cookies.clear()
         else:
-            print("[-] ERROR: 下载验证码失败, 请检查系统是否可以正常访问!")
+            session_obj.log.logger.error('ERROR: 下载验证码失败, 请检查系统是否可以正常访问!')
     return False, ''
 
 
@@ -291,12 +292,12 @@ def auto_login(session_obj, username, password, threshold: int=100):
     captcha_verify_threshold = 500
     status_verify, res_verify = captcha_verify(session_obj, captcha_verify_threshold)
     if not status_verify:
-        print('[-] 识别验证码{}次未获得合法验证码, 退出程序!'.format(captcha_verify_threshold))
+        h.log.logger.warning('识别验证码{}次未获得合法验证码, 退出程序!'.format(captcha_verify_threshold))
         sys.exit()
     else:
-        print('[+] 识别到合法验证码: {}'.format(res_verify))
+        h.log.logger.info('识别到合法验证码: {}'.format(res_verify))
     for i in range(threshold):
-        print('[*] 尝试登陆中, 第{}次...'.format(i + 1))
+        h.log.logger.warning('尝试登陆中, 第{}次...'.format(i + 1))
         post_data = {
             'SYNCHRONIZER_TOKEN': session_obj.token,
             'SYNCHRONIZER_URI': '/login',
@@ -308,24 +309,25 @@ def auto_login(session_obj, username, password, threshold: int=100):
             resp = session_obj.s.post(url=login_url, data=post_data, headers=session_obj.headers)
             result = resp.content.decode('utf-8')
         except Exception as err:
-            print('[*] 发送请求失败==> {}'.format(err))
+            h.log.logger.error('发送请求失败: {}'.format(err))
             if str(err) == 'Exceeded 30 redirects.':
+                h.log.logger.critical('Exceeded 30 redirects.')
                 sys.exit()
         else:
             root = etree.HTML(result)
             title = root.xpath("//title")[0].text
             if (title == '自选座位 :: 图书馆空间预约系统'):
-                return True, '登录成功', session_obj
+                return True, session_obj
             else:
                 # 换个验证码继续干...
-                print('[*] 验证码校验不通过, 重新获取验证码!')
+                h.log.logger.warning('验证码校验不通过, 重新获取验证码!')
                 status_verify, res_verify = captcha_verify(session_obj, captcha_verify_threshold)
                 if not status_verify:
-                    print('[-] 识别验证码{}次未获得合法验证码, 退出程序!'.format(captcha_verify_threshold))
+                    h.log.logger.error('识别验证码{}次未获得合法验证码, 退出程序!'.format(captcha_verify_threshold))
                     sys.exit()
                 else:
-                    print('[+] 识别到合法验证码: {}'.format(res_verify))
-    print('[-] 尝试登陆{}次后未遇到正确的验证码, 推出程序'.format(threshold))
+                    h.log.logger.info('识别到合法验证码: {}'.format(res_verify))
+    h.log.logger.error('尝试登陆{}次后未遇到正确的验证码, 退出程序'.format(threshold))
     sys.exit()
 
 
@@ -364,9 +366,9 @@ if __name__ == '__main__':
         goal_seats = sd.query_sql("SELECT seat_id, seat_number, seat_room FROM seat_info ORDER BY seat_number DESC")
 
     h = HljuLibrarySeat(retries=max_retries, backoff_factor=backoff_factor, status_forcelist=[500, 502, 503, 504])
-    login_status, login_msg, h = auto_login(session_obj=h, username=username, password=password)
+    login_status, h = auto_login(session_obj=h, username=username, password=password)
     if login_status:
-        print('[+] 登录成功!')
+        h.log.logger.info('登陆成功!')
         h.wait_open(hour=system_open_time[0], minute=system_open_time[1])
         # ======================= 查询空座, 然后订座, 会卡爆 =========================
         # get_free_flag, free_seats = h.get_free_book_info()
@@ -377,19 +379,18 @@ if __name__ == '__main__':
         for offset_num in range(0, 120, 15):  # 从起始时间开始, 每间隔15分钟尝试一次任务, 直到两个小时为止
             for seat in goal_seats:
                 start_time += offset_num
-                print('[+] 当前预定起始时间为: %d' % (start_time / 60))
+                h.log.logger.info('当前预定起始时间为: %d' % (start_time / 60))
                 seat_id_code: str = seat[0]
                 seat_num: str = seat[1]
                 seat_room: str = seat[2]
                 # 每次提交预定信息前要先访问一次"自助选座"获取"预定token", 否则会出现非法Invalid CSRF token错误
                 if not h.get_book_token():
-                    print('[-] ERROR: 获取预定token失败!')
-                print("[+] 当前预定目标为: {0}-->{1}".format(seat_room, seat_num))
+                    h.log.logger.error('获取预定token失败!')
+                h.log.logger.info("当前预定目标为: {0}-->{1}".format(seat_room, seat_num))
                 h.book_seat(seat_id=seat_id_code, start=start_time, end=end_time, date=h.tomorrow_date)
         # ====================== 调试代码 ==============================
         # 每次提交预定信息前要先访问一次"自助选座"获取"预定token", 否则会出现非法Invalid CSRF token错误
         # if not h.get_book_token():
-        #     print('[-] ERROR: 获取预定token失败!')
         # h.book_seat('21409', '1260', '1320')
     else:
-        print('[-] ERROR: 请检查是否可以正常访问登录页面, 以及验证是否输入正确!')
+        h.log.logger.error('请检查是否可以正常访问登录页面, 以及验证是否输入正确!')

@@ -1,5 +1,5 @@
 .idea/
-
+logs/*.log.*
 sec.py
 *.jpg
 *.pyc
