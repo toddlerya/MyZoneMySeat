@@ -342,7 +342,7 @@ if __name__ == '__main__':
     # 结束时间
     end_time = 1320  # 1320 ---> 22:00
     # 预定房间名称
-    goal_room = '三楼原电阅室-预约'
+    goal_room = ['三楼自习室-预约', '三楼原电阅室-预约']
     # 系统开放时间
     system_open_time = (18, 30)  # 18:30
     # 网络访问失败重试次数, 应对渣服务器
@@ -357,8 +357,14 @@ if __name__ == '__main__':
 
     #  直接从数据库读取目标房间的座位信息, 按照ID从大到小排列, 暴力抢座
     sd = SeatDB()
-    # goal_seats = sd.query_sql("SELECT seat_id, seat_number FROM seat_info WHERE seat_room = ? ORDER BY seat_id DESC", goal_room)
-    goal_seats = sd.query_sql("SELECT seat_id, seat_number, seat_room FROM seat_info ORDER BY seat_id DESC")
+    if goal_room:
+        where_condition = "WHERE seat_room IN ({C})".format(C=",".join([repr(ele) for ele in goal_room]))
+        print(where_condition)
+        goal_seats = sd.query_sql(
+            "SELECT seat_id, seat_number, seat_room FROM seat_info {W_C} ORDER BY seat_number DESC".format(
+                W_C=where_condition))
+    else:
+        goal_seats = sd.query_sql("SELECT seat_id, seat_number, seat_room FROM seat_info ORDER BY seat_number DESC")
 
     h = HljuLibrarySeat(retries=max_retries, backoff_factor=backoff_factor, status_forcelist=[500, 502, 503, 504])
     login_status, login_msg, h = auto_login(session_obj=h, username=username, password=password)

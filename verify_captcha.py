@@ -201,6 +201,6 @@ def download_captcha():
 
 
 if __name__ == '__main__':
-    download_captcha()
+    # download_captcha()
     img = 'captcha.jpg'
     print(verify(img))

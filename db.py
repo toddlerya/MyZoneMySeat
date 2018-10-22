@@ -66,3 +66,20 @@ if __name__ == '__main__':
     ss = sd.query_sql("SELECT count(seat_id) as sn, seat_room FROM seat_info GROUP BY seat_room ORDER BY sn DESC")
     for s in ss:
         print(s)
+
+    # where_condition = "seat_room IN ('三楼自习室-预约', '三楼原电阅室-预约')"
+    # goal_seats = sd.query_sql(
+    #     "SELECT seat_id, seat_number, seat_room FROM seat_info WHERE {W_C} ORDER BY seat_id DESC".format(W_C=where_condition))
+
+    goal_room = ['三楼自习室-预约', '三楼原电阅室-预约']
+    goal_room = []
+    if goal_room:
+        where_condition = "WHERE seat_room IN ({C})".format(C=",".join([repr(ele) for ele in goal_room]))
+        goal_seats = sd.query_sql(
+            "SELECT seat_id, seat_number, seat_room FROM seat_info {W_C} ORDER BY seat_number DESC".format(
+                W_C=where_condition))
+    else:
+        goal_seats = sd.query_sql("SELECT seat_id, seat_number, seat_room FROM seat_info ORDER BY seat_number DESC")
+    for seat in goal_seats:
+        print(seat)
+        break
