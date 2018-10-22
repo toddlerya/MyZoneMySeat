@@ -309,8 +309,6 @@ def auto_login(session_obj, username, password, threshold: int=100):
             result = resp.content.decode('utf-8')
         except Exception as err:
             print('[*] 发送请求失败==> {}'.format(err))
-            print('我看看有没有cookies===>', session_obj.s.cookies.get_dict())
-            print('post===>', post_data)
             if str(err) == 'Exceeded 30 redirects.':
                 sys.exit()
         else:
