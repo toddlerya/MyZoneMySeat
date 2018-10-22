@@ -24,7 +24,8 @@ from base_lib import Logger, my_log_file
 class HljuLibrarySeat(object):
 
     def __init__(self, retries=10, backoff_factor=0.1, status_forcelist=[500, 502, 503, 504]):
-        self.log = Logger(log_name=my_log_file(__file__), level=log_level, fmt='%(asctime)s - [line:%(lineno)d] - %(levelname)s: %(message)s')
+        self.log = Logger(log_name=my_log_file(__file__), level=log_level,
+                          fmt='%(asctime)s - [line:%(lineno)d] - %(levelname)s: %(message)s')
         self.s = requests.session()
         # 重试访问, 应对服务器崩溃的情况
         # https://stackoverflow.com/questions/15431044/can-i-set-max-retries-for-requests-request
@@ -189,27 +190,31 @@ class HljuLibrarySeat(object):
             "start": str(start),  # 480 ---> 8:00
             "end": str(end)  # 1320 ---> 22:00
         }
-        resp = self.s.post(url=book_seat_self_url, data=post_data, headers=self.headers, timeout=30.0)
-        if resp.status_code != 200:
-            self.log.logger.error('预定失败, 请求错误! HTTP_CODE: %d', resp.status_code)
-        html = resp.content.decode("utf-8")
-        root = etree.HTML(html)
         try:
-            temp_book_status = root.xpath('''//div[@class="layoutSeat"]/dl''')
-            book_status = temp_book_status[0][0].text
+            resp = self.s.post(url=book_seat_self_url, data=post_data, headers=self.headers, timeout=30.0)
         except Exception as err:
-            self.log.logger.error('获取预定信息错误 ERROR_MSG: %s' % err)
+            self.log.logger.critical('预定座位请求发送失败 ERROR_MSG: {}'.format(err))
         else:
-            if book_status == '系统已经为您预定好了':
-                self.log.logger.info('预定成功, 请登录系统查看预约信息!')
-                sys.exit()
+            if resp.status_code != 200:
+                self.log.logger.error('预定失败, 请求错误! HTTP_CODE: {}'.format(resp.status_code))
+            html = resp.content.decode("utf-8")
+            root = etree.HTML(html)
+            try:
+                temp_book_status = root.xpath('''//div[@class="layoutSeat"]/dl''')
+                book_status = temp_book_status[0][0].text
+            except Exception as err:
+                self.log.logger.error('获取预定信息错误 ERROR_MSG: {}'.format(err))
             else:
-                fail_msg = temp_book_status[0].xpath('//span/text()[last()]')[-1]
-                if fail_msg == '已有1个有效预约，请在使用结束后再次进行选择':
-                    self.log.logger.error('预定失败: {{ %s }}' % fail_msg)
+                if book_status == '系统已经为您预定好了':
+                    self.log.logger.info('预定成功, 请登录系统查看预约信息!')
                     sys.exit()
                 else:
-                    self.log.logger.error('预定失败: {{ %s }}, 继续尝试其他座位!' % fail_msg)
+                    fail_msg = temp_book_status[0].xpath('//span/text()[last()]')[-1]
+                    if fail_msg == '已有1个有效预约，请在使用结束后再次进行选择':
+                        self.log.logger.error('预定失败: < {} >'.format(fail_msg))
+                        sys.exit()
+                    else:
+                        self.log.logger.error('预定失败: < {} >, 继续尝试其他座位!'.format(fail_msg))
 
     def wait_open(self, hour, minute):
         self.log.logger.info('等待系统预定时间开放... 开放预定时间为 %d:%d' % (int(hour), int(minute)))
@@ -230,7 +235,7 @@ class HljuLibrarySeat(object):
                 time.sleep(0.5)
 
 
-def captcha_verify(session_obj, threshold: int=100):
+def captcha_verify(session_obj, threshold: int = 100):
     """
     下载识别验证码, 直到获得合法验证码为止
     :param threshold: 失败阈值, 默认500次
@@ -281,7 +286,7 @@ def captcha_verify(session_obj, threshold: int=100):
     return False, ''
 
 
-def auto_login(session_obj, username, password, threshold: int=100):
+def auto_login(session_obj, username, password, threshold: int = 100):
     """
     自动识别验证码登陆, 目前验证码识别率低, 容易失败, 所以多试几次, 总有成功的机会
     :param username:
