@@ -357,7 +357,6 @@ if __name__ == '__main__':
     sd = SeatDB()
     if goal_room:
         where_condition = "WHERE seat_room IN ({C})".format(C=",".join([repr(ele) for ele in goal_room]))
-        print(where_condition)
         goal_seats = sd.query_sql(
             "SELECT seat_id, seat_number, seat_room FROM seat_info {W_C} ORDER BY seat_number DESC".format(
                 W_C=where_condition))
