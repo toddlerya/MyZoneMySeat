@@ -297,5 +297,3 @@ if __name__ == '__main__':
         h.log.logger.info('爬取数据入库完成')
     else:
         h.log.logger.error('请检查是否可以正常访问登录页面, 以及验证是否输入正确!')
-    sd.cur.close()
-    sd.conn.close()

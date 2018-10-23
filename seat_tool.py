@@ -163,15 +163,20 @@ class HljuLibrarySeat(object):
             return False, all_free_seat
 
     def get_book_token(self):
-        resp = self.s.get(url=booking_url_01, headers=self.headers, timeout=10.0)
-        html = resp.content.decode('utf-8')
-        root = etree.HTML(html)
-        book_token_ele = root.xpath('//input[@name="SYNCHRONIZER_TOKEN"]')[0]
-        self.book_token = book_token_ele.get('value')
-        if len(self.book_token) == 36:
-            return True
-        else:
+        try:
+            resp = self.s.get(url=booking_url_01, headers=self.headers, timeout=10.0)
+        except Exception as err:
+            self.log.logger.error('获取预定token失败: {}'.format(err))
             return False
+        else:
+            html = resp.content.decode('utf-8')
+            root = etree.HTML(html)
+            book_token_ele = root.xpath('//input[@name="SYNCHRONIZER_TOKEN"]')[0]
+            self.book_token = book_token_ele.get('value')
+            if len(self.book_token) == 36:
+                return True
+            else:
+                return False
 
     def book_seat(self, seat_id: str, start, end, date=str(datetime.date.today())):
         """
@@ -227,10 +232,14 @@ class HljuLibrarySeat(object):
                 self.log.logger.info('时间到我们开始抢座位!')
                 break
             elif now_time <= open_time_int - 3:
-                resp = self.s.get(url=booking_url_01, headers=self.headers, timeout=10.0)
-                if resp.status_code == 200:
-                    self.log.logger.info('等待中, 确认存活...')
-                time.sleep(20)
+                try:
+                    resp = self.s.get(url=booking_url_01, headers=self.headers, timeout=10.0)
+                except Exception as err:
+                    self.log.logger.error('等待中, 查询主页失败: {}'.format(err))
+                else:
+                    if resp.status_code == 200:
+                        self.log.logger.info('等待中, 确认存活...')
+                    time.sleep(20)
             else:
                 time.sleep(0.5)
 
