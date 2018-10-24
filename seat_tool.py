@@ -6,7 +6,6 @@
 # @Project  : MyZoneMySeat
 
 import requests
-import os
 import sys
 import datetime
 import time
@@ -19,6 +18,7 @@ from sec import username, password
 from verify_captcha import verify
 from db import SeatDB
 from base_lib import Logger, my_log_file
+from send_mail import mail
 
 
 class HljuLibrarySeat(object):
@@ -173,10 +173,12 @@ class HljuLibrarySeat(object):
         else:
             return False
 
-    def book_seat(self, seat_id: str, start, end, date=str(datetime.date.today())):
+    def book_seat(self, seat_id: str, room, number, start, end, date=str(datetime.date.today())):
         """
         提交预定座位表单
         :param seat_id: 座位ID
+        :param room: 房间名称
+        :param number: 座位编号
         :param start: 使用开始时间
         :param end:  使用结束时间
         :param date: 预定日期, 默认为当日
@@ -207,11 +209,13 @@ class HljuLibrarySeat(object):
             else:
                 if book_status == '系统已经为您预定好了':
                     self.log.logger.info('预定成功, 请登录系统查看预约信息!')
+                    mail(subject='预定成功', content='座位信息: {R} - {N}\n请登陆系统核查确认!'.format(R=room, N=number))
                     sys.exit()
                 else:
                     fail_msg = temp_book_status[0].xpath('//span/text()[last()]')[-1]
                     if fail_msg == '已有1个有效预约，请在使用结束后再次进行选择':
                         self.log.logger.error('预定失败: < {} >'.format(fail_msg))
+                        mail(subject='预定失败', content=fail_msg)
                         sys.exit()
                     else:
                         self.log.logger.error('预定失败: < {} >, 继续尝试其他座位!'.format(fail_msg))
@@ -392,7 +396,8 @@ if __name__ == '__main__':
                 if not h.get_book_token():
                     h.log.logger.error('获取预定token失败!')
                 h.log.logger.info("当前预定目标为: {0}-->{1}".format(seat_room, seat_num))
-                h.book_seat(seat_id=seat_id_code, start=start_time, end=end_time, date=h.tomorrow_date)
+                h.book_seat(seat_id=seat_id_code, room=seat_room, number=seat_num, start=start_time, end=end_time,
+                            date=h.tomorrow_date)
         # ====================== 调试代码 ==============================
         # 每次提交预定信息前要先访问一次"自助选座"获取"预定token", 否则会出现非法Invalid CSRF token错误
         # if not h.get_book_token():
