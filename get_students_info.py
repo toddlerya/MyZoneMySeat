@@ -16,7 +16,6 @@ from lxml import etree
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from hlju_lib_config import *
-from sec import username, password
 from verify_captcha import verify
 from db import SeatDB
 from base_lib import Logger, my_log_file
@@ -208,14 +207,13 @@ def auto_login(session_obj, username, password, threshold: int = 100):
                 h.log.logger.critical('Exceeded 30 redirects.')
                 sys.exit()
         else:
+            print('===>', result)
             root = etree.HTML(result)
             title = root.xpath("//title")[0].text
             msg_box = root.xpath('//*[@id="msgBoxDIV"]/span/text()')[0].strip()
             if (title == '自选座位 :: 图书馆空间预约系统'):
-                return True, session_obj
-            elif not msg_box:
-                print('=====>{}'.format(msg_box))
-            else:
+                return True, '登录成功', session_obj
+            elif msg_box == '':
                 # 换个验证码继续干...
                 h.log.logger.warning('验证码校验不通过, 重新获取验证码!')
                 status_verify, res_verify = captcha_verify(session_obj, captcha_verify_threshold)
@@ -224,6 +222,8 @@ def auto_login(session_obj, username, password, threshold: int = 100):
                     sys.exit()
                 else:
                     h.log.logger.info('识别到合法验证码: {}'.format(res_verify))
+            else:
+                print('=====>{}'.format(msg_box))
     h.log.logger.error('尝试登陆{}次后未遇到正确的验证码, 退出程序'.format(threshold))
     sys.exit()
 
@@ -232,24 +232,23 @@ if __name__ == '__main__':
     sd = SeatDB()
     sd.init_seat_info_tb()
     h = HljuLibrarySeat()
-
-    for i in range(20150000, 20189999):
-        username = str(i)
-        password = str(i)
-        login_status, h = auto_login(session_obj=h, username=username, password=password)
-        if login_status:
-            h.log.logger.info('登陆成功!')
-            print(username)
-            # h.log.logger.info('开始爬取所有座位信息...')
-            # all_seat_data = list()
-            # for room in room_desc_dict:
-            #     flag, seat_info_dict = h.get_seat_by_room(room_id=room)
-            #     for seat_id, seat_info in seat_info_dict.items():
-            #         temp_data = [seat_id, seat_info[0], seat_info[1]]
-            #         all_seat_data.append(temp_data)
-            # sd.load_seat_info(all_seat_data)
-            # h.log.logger.info('爬取数据入库完成')
-        else:
-            h.log.logger.error('请检查是否可以正常访问登录页面, 以及验证是否输入正确!')
-    sd.cur.close()
-    sd.conn.close()
+    login_status, login_msg, h = auto_login(session_obj=h, username='20153573', password='20153573')
+    print(login_status, login_msg)
+    # for i in range(20150000, 20189999):
+    #     username = str(i)
+    #     password = str(i)
+    #     login_status, login_msg, h = auto_login(session_obj=h, username=username, password=password)
+    #     if login_status:
+    #         h.log.logger.info('登陆成功!')
+    #         print(username)
+    #         # h.log.logger.info('开始爬取所有座位信息...')
+    #         # all_seat_data = list()
+    #         # for room in room_desc_dict:
+    #         #     flag, seat_info_dict = h.get_seat_by_room(room_id=room)
+    #         #     for seat_id, seat_info in seat_info_dict.items():
+    #         #         temp_data = [seat_id, seat_info[0], seat_info[1]]
+    #         #         all_seat_data.append(temp_data)
+    #         # sd.load_seat_info(all_seat_data)
+    #         # h.log.logger.info('爬取数据入库完成')
+    #     else:
+    #         h.log.logger.error('请检查是否可以正常访问登录页面, 以及验证是否输入正确!')
