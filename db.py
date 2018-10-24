@@ -7,6 +7,7 @@
 
 import sqlite3
 
+
 class SeatDB(object):
     def __init__(self):
         self.db_name = "seat.db"
