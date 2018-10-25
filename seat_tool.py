@@ -368,9 +368,9 @@ if __name__ == '__main__':
     # {backoff factor} * (2 ^ ({number of total retries} - 1)) seconds.
     # If the backoff_factor is 0.1, then sleep() will sleep for [0.0s, 0.2s, 0.4s, …] between retries.
     # It will never be longer than Retry.BACKOFF_MAX
-    max_retries = 11
-    backoff_factor = 1
-    # 1 * 2 ** 10 / 60 = 17 min
+    max_retries = 6
+    backoff_factor = 0.1
+    # 0.1 * 2 ** (6-1) = 3.2 sec
     # ==================== 用户自定义配置 END ==========================
 
     #  直接从数据库读取目标房间的座位信息, 按照ID从大到小排列, 暴力抢座
