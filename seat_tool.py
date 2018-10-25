@@ -9,6 +9,9 @@ import requests
 import sys
 import datetime
 import time
+import threading
+from threading import Thread
+from queue import Queue
 from random import choice
 from lxml import etree
 from requests.adapters import HTTPAdapter
@@ -19,6 +22,56 @@ from verify_captcha import verify
 from db import SeatDB
 from base_lib import Logger, my_log_file
 from send_mail import mail
+
+
+class ThreadPoolManager(object):
+    """
+    线程池管理器
+    """
+
+    def __init__(self, thread_num):
+        self.work_queue = Queue()
+        self.thread_num = thread_num
+        self.__init_threading_pool(self.thread_num)
+
+    def __init_threading_poll(self, thread_num):
+        """
+        初始化线程池，创建指定数量的线程池
+        :param thread_num:
+        :return:
+        """
+        for i in range(thread_num):
+            thread = ThreadPoolManager(self.work_queue)
+            thread.start()
+
+    def add_job(self, func, *args):
+        """
+        将任务放入队列，等待线程池阻塞读取，参数是被执行的函数和函数的参数
+        :param func:
+        :param args:
+        :return:
+        """
+
+
+class ThreadManger(Thread):
+    """
+    定义线程类，继承threading.Thread
+    """
+
+    def __init__(self, work_queue):
+        Thread.__init__(self)
+        self.work_queue = work_queue
+        self.daemon = True
+
+    def run(self):
+        """
+        启动线程
+        :return:
+        """
+        while True:
+            target, args = self.work_queue.get()
+            target(*args)
+            self.work_queue.task_done()
 
 
 class HljuLibrarySeat(object):
@@ -382,6 +435,11 @@ if __name__ == '__main__':
                 W_C=where_condition))
     else:
         goal_seats = sd.query_sql("SELECT seat_id, seat_number, seat_room FROM seat_info ORDER BY seat_number DESC")
+
+    # 开个线程池
+    thread_pool = ThreadPoolManager(5)
+
+    # https://www.jianshu.com/p/afd9b3deb027
 
     h = HljuLibrarySeat(retries=max_retries, backoff_factor=backoff_factor, status_forcelist=[500, 502, 503, 504])
     login_status, h = auto_login(session_obj=h, username=username, password=password)
