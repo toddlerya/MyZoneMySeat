@@ -13,7 +13,7 @@ from base_lib import Logger, my_log_file
 from hlju_lib_config import log_level
 from sec import mail_host, mail_port, mail_user, mail_password, receivers
 
-sender = 'toddlerya@sina.com'
+
 
 
 def mail(subject='', content=''):
@@ -21,13 +21,13 @@ def mail(subject='', content=''):
                  fmt='%(asctime)s - [line:%(lineno)d] - %(levelname)s: %(message)s')
     message = MIMEText(content, 'plain', 'utf-8')
     message['Subject'] = 'MyZoneMySeat-预定信息-{}'.format(subject)
-    message['From'] = sender
+    message['From'] = mail_user
     message['To'] = "; ".join(receivers)
     try:
         smtp_cli = smtplib.SMTP()
         smtp_cli.connect(host=mail_host, port=mail_port)
         smtp_cli.login(mail_user, mail_password)
-        smtp_cli.sendmail(sender, receivers, message.as_string())
+        smtp_cli.sendmail(mail_user, receivers, message.as_string())
         smtp_cli.quit()
         log.logger.info('发送邮件成功! {S}: {C}'.format(S=subject, C=content))
     except Exception as err:
