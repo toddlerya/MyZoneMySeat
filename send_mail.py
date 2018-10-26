@@ -11,11 +11,11 @@ import smtplib
 from email.mime.text import MIMEText
 from base_lib import Logger, my_log_file
 from hlju_lib_config import log_level
-from sec import mail_user, mail_password, receivers
+from sec import mail_host, mail_port, mail_user, mail_password, receivers
 
 sender = 'toddlerya@sina.com'
 
-mail_host = 'smtp.sina.com'
+
 
 
 def mail(subject='', content=''):
@@ -27,7 +27,7 @@ def mail(subject='', content=''):
     message['To'] = "; ".join(receivers)
     try:
         smtp_cli = smtplib.SMTP()
-        smtp_cli.connect(host=mail_host)
+        smtp_cli.connect(host=mail_host, port=mail_port)
         smtp_cli.login(mail_user, mail_password)
         smtp_cli.sendmail(sender, receivers, message.as_string())
         smtp_cli.quit()
@@ -37,4 +37,4 @@ def mail(subject='', content=''):
 
 
 if __name__ == '__main__':
-    mail()
+    mail('test', 'just a test')
