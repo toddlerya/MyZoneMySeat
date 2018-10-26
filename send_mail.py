@@ -14,8 +14,6 @@ from hlju_lib_config import log_level
 from sec import mail_host, mail_port, mail_user, mail_password, receivers
 
 
-
-
 def mail(subject='', content=''):
     log = Logger(log_name=my_log_file(__file__), level=log_level,
                  fmt='%(asctime)s - [line:%(lineno)d] - %(levelname)s: %(message)s')
