@@ -22,8 +22,7 @@ def mail(subject='', content=''):
     message['From'] = mail_user
     message['To'] = "; ".join(receivers)
     try:
-        smtp_cli = smtplib.SMTP()
-        smtp_cli.connect(host=mail_host, port=mail_port)
+        smtp_cli = smtplib.SMTP_SSL(host=mail_host, port=mail_port)
         smtp_cli.login(mail_user, mail_password)
         smtp_cli.sendmail(mail_user, receivers, message.as_string())
         smtp_cli.quit()
