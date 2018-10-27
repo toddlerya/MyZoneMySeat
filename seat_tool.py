@@ -394,10 +394,12 @@ if __name__ == '__main__':
         #     for each_seat_id, each_seat_info in free_seats.items():
         #         h.book_seat(seat_id=each_seat_id, start=stat_time, end=end_time)
         # ======================= 根据数据库的座位, 直接下单, 直到成功为止 ==========================
-        for offset_num in range(0, 120, 15):  # 从起始时间开始, 每间隔15分钟尝试一次任务, 直到两个小时为止
+        # 从起始时间开始, 每间隔15分钟尝试一次任务, 直到两个小时为止
+        offset_num = 15
+        for _ in range(0, 120, offset_num):
+            start_time += offset_num
+            h.log.logger.info('当前预定起始时间为: %f' % (start_time / 60))
             for seat in goal_seats:
-                start_time += offset_num
-                h.log.logger.info('当前预定起始时间为: %d' % (start_time / 60))
                 seat_id_code: str = seat[0]
                 seat_num: str = seat[1]
                 seat_room: str = seat[2]
