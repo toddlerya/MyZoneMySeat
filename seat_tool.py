@@ -418,7 +418,7 @@ if __name__ == '__main__':
     login_status, h = auto_login(session_obj=h, username=username, password=password)
     if login_status:
         h.log.logger.info('登陆成功!')
-        # h.wait_open(hour=system_open_time[0], minute=system_open_time[1])
+        h.wait_open(hour=system_open_time[0], minute=system_open_time[1])
         # ======================= 查询空座, 然后订座, 会卡爆 =========================
         # get_free_flag, free_seats = h.get_free_book_info()
         # if get_free_flag:
