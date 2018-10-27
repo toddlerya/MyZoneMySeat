@@ -218,7 +218,7 @@ class HljuLibrarySeat(object):
             else:
                 if book_status == '系统已经为您预定好了':
                     self.log.logger.info('预定成功, 请登录系统查看预约信息!')
-                    mail(subject='预定成功', content='座位信息: {R} - {N}\n请登陆系统核查确认!'.format(R=room, N=number))
+                    mail(subject='预定成功', content='座位信息: {R} - {N} 请登陆系统核查确认!'.format(R=room, N=number))
                     return False
                 else:
                     fail_msg = temp_book_status[0].xpath('//span/text()[last()]')[-1]
