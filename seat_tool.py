@@ -10,8 +10,7 @@ import sys
 import datetime
 import time
 import threading
-from threading import Thread
-from queue import Queue
+from concurrent.futures import ThreadPoolExecutor
 from random import choice
 from lxml import etree
 from requests.adapters import HTTPAdapter
@@ -22,56 +21,6 @@ from verify_captcha import verify
 from db import SeatDB
 from base_lib import Logger, my_log_file
 from send_mail import mail
-
-
-class ThreadPoolManager(object):
-    """
-    线程池管理器
-    """
-
-    def __init__(self, thread_num):
-        self.work_queue = Queue()
-        self.thread_num = thread_num
-        self.__init_threading_pool(self.thread_num)
-
-    def __init_threading_poll(self, thread_num):
-        """
-        初始化线程池，创建指定数量的线程池
-        :param thread_num:
-        :return:
-        """
-        for i in range(thread_num):
-            thread = ThreadPoolManager(self.work_queue)
-            thread.start()
-
-    def add_job(self, func, *args):
-        """
-        将任务放入队列，等待线程池阻塞读取，参数是被执行的函数和函数的参数
-        :param func:
-        :param args:
-        :return:
-        """
-
-
-class ThreadManger(Thread):
-    """
-    定义线程类，继承threading.Thread
-    """
-
-    def __init__(self, work_queue):
-        Thread.__init__(self)
-        self.work_queue = work_queue
-        self.daemon = True
-
-    def run(self):
-        """
-        启动线程
-        :return:
-        """
-        while True:
-            target, args = self.work_queue.get()
-            target(*args)
-            self.work_queue.task_done()
 
 
 class HljuLibrarySeat(object):
@@ -240,7 +189,7 @@ class HljuLibrarySeat(object):
         :param start: 使用开始时间
         :param end:  使用结束时间
         :param date: 预定日期, 默认为当日
-        :return: 无返回值, 预定成功则终止程序
+        :return: 预定到座位或已经有预约导致无法下单返回False其他情况返回True
         """
         post_data = {
             'SYNCHRONIZER_TOKEN': self.book_token,
@@ -254,6 +203,7 @@ class HljuLibrarySeat(object):
             resp = self.s.post(url=book_seat_self_url, data=post_data, headers=self.headers, timeout=30.0)
         except Exception as err:
             self.log.logger.critical('预定座位请求发送失败 ERROR_MSG: {}'.format(err))
+            return True
         else:
             if resp.status_code != 200:
                 self.log.logger.error('预定失败, 请求错误! HTTP_CODE: {}'.format(resp.status_code))
@@ -264,19 +214,21 @@ class HljuLibrarySeat(object):
                 book_status = temp_book_status[0][0].text
             except Exception as err:
                 self.log.logger.error('获取预定信息错误 ERROR_MSG: {}'.format(err))
+                return True
             else:
                 if book_status == '系统已经为您预定好了':
                     self.log.logger.info('预定成功, 请登录系统查看预约信息!')
-                    mail(subject='预定成功', content='座位信息: {R} - {N}\n请登陆系统核查确认!'.format(R=room, N=number))
-                    sys.exit()
+                    mail(subject='预定成功', content='座位信息: {R} - {N} 请登陆系统核查确认!'.format(R=room, N=number))
+                    return False
                 else:
                     fail_msg = temp_book_status[0].xpath('//span/text()[last()]')[-1]
                     if fail_msg == '已有1个有效预约，请在使用结束后再次进行选择':
                         self.log.logger.error('预定失败: < {} >'.format(fail_msg))
                         mail(subject='预定失败', content=fail_msg)
-                        sys.exit()
+                        return False
                     else:
                         self.log.logger.error('预定失败: < {} >, 继续尝试其他座位!'.format(fail_msg))
+                        return True
 
     def wait_open(self, hour, minute):
         self.log.logger.info('等待系统预定时间开放... 开放预定时间为 %d:%d' % (int(hour), int(minute)))
@@ -402,6 +354,27 @@ def auto_login(session_obj, username, password, threshold: int = 100):
     sys.exit()
 
 
+def do_book(session_obj, seat_room, seat_num, seat_id, start, end, date):
+    """
+    执行预定动作
+    :param session_obj:
+    :param seat_room:
+    :param seat_num:
+    :param seat_id:
+    :param start:
+    :param end:
+    :param date:
+    :return:
+    """
+    # 每次提交预定信息前要先访问一次"自助选座"获取"预定token", 否则会出现非法Invalid CSRF token错误
+    session_obj.log.logger.info('当前线程ID: {}'.format(threading.current_thread().name))
+    if not session_obj.get_book_token():
+        session_obj.log.logger.error('获取预定token失败!')
+    session_obj.log.logger.info("当前预定目标为: {0}-->{1}".format(seat_room, seat_num))
+    return session_obj.book_seat(seat_id=seat_id, room=seat_room, number=seat_num, start=start, end=end, date=date)
+
+
+
 if __name__ == '__main__':
     # ==================== 用户自定义配置 BEGIN =======================
     # 请根据需要修改时间配置
@@ -413,7 +386,8 @@ if __name__ == '__main__':
     # 结束时间
     end_time = 1320  # 1320 ---> 22:00
     # 预定房间名称
-    goal_room = ['三楼自习室-预约', '三楼原电阅室-预约']
+    # goal_room = ['三楼自习室-预约', '三楼原电阅室-预约']
+    goal_room = []
     # 系统开放时间
     system_open_time = (18, 30)  # 18:30
     # 网络访问失败重试次数, 应对渣服务器
@@ -425,6 +399,9 @@ if __name__ == '__main__':
     backoff_factor = 0.1
     # 0.1 * 2 ** (6-1) = 3.2 sec
     # ==================== 用户自定义配置 END ==========================
+    # 多线程
+    thread_num = 5
+    # https://www.cnblogs.com/zhang293/p/7954353.html
 
     #  直接从数据库读取目标房间的座位信息, 按照ID从大到小排列, 暴力抢座
     sd = SeatDB()
@@ -436,35 +413,42 @@ if __name__ == '__main__':
     else:
         goal_seats = sd.query_sql("SELECT seat_id, seat_number, seat_room FROM seat_info ORDER BY seat_number DESC")
 
-    # 开个线程池
-    thread_pool = ThreadPoolManager(5)
-
-    # https://www.jianshu.com/p/afd9b3deb027
 
     h = HljuLibrarySeat(retries=max_retries, backoff_factor=backoff_factor, status_forcelist=[500, 502, 503, 504])
     login_status, h = auto_login(session_obj=h, username=username, password=password)
     if login_status:
         h.log.logger.info('登陆成功!')
-        h.wait_open(hour=system_open_time[0], minute=system_open_time[1])
+        # h.wait_open(hour=system_open_time[0], minute=system_open_time[1])
         # ======================= 查询空座, 然后订座, 会卡爆 =========================
         # get_free_flag, free_seats = h.get_free_book_info()
         # if get_free_flag:
         #     for each_seat_id, each_seat_info in free_seats.items():
         #         h.book_seat(seat_id=each_seat_id, start=stat_time, end=end_time)
         # ======================= 根据数据库的座位, 直接下单, 直到成功为止 ==========================
-        for offset_num in range(0, 120, 15):  # 从起始时间开始, 每间隔15分钟尝试一次任务, 直到两个小时为止
+        # 从起始时间开始, 每间隔15分钟尝试一次任务, 直到两个小时为止
+        offset_num = 15
+        for _ in range(0, 825, offset_num):
+            start_time += offset_num
+            h.log.logger.info('当前预定起始时间为: %f' % (start_time / 60))
+            book_form = list()
             for seat in goal_seats:
-                start_time += offset_num
-                h.log.logger.info('当前预定起始时间为: %d' % (start_time / 60))
                 seat_id_code: str = seat[0]
                 seat_num: str = seat[1]
                 seat_room: str = seat[2]
-                # 每次提交预定信息前要先访问一次"自助选座"获取"预定token", 否则会出现非法Invalid CSRF token错误
-                if not h.get_book_token():
-                    h.log.logger.error('获取预定token失败!')
-                h.log.logger.info("当前预定目标为: {0}-->{1}".format(seat_room, seat_num))
-                h.book_seat(seat_id=seat_id_code, room=seat_room, number=seat_num, start=start_time, end=end_time,
-                            date=h.tomorrow_date)
+                book_form.append([h, seat_room, seat_num, seat_id_code, start_time, end_time, h.tomorrow_date])
+                # book_form.append([h, 'sssssssss', '255', '29899', 1020, 1080, '2018-10-27'])
+            # 多线程抢座
+            with ThreadPoolExecutor(thread_num) as executor:
+                for each in book_form:
+                    f = executor.submit(do_book, *each)
+                    thread_err = f.exception()
+                    if thread_err:
+                        h.log.logger.error('thread_err: {}'.format(thread_err))
+                        sys.exit()
+                    thread_res = f.result()
+                    if thread_res is False:
+                        sys.exit()
+
         # ====================== 调试代码 ==============================
         # 每次提交预定信息前要先访问一次"自助选座"获取"预定token", 否则会出现非法Invalid CSRF token错误
         # if not h.get_book_token():
