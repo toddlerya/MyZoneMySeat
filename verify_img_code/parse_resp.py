@@ -5,11 +5,12 @@
 # @FileName : parse_resp.py
 # @Project  : test
 
-from __future__ import unicode_literals
-
 import json
 import base64
+import codecs
 import numpy as np
+
+np.set_printoptions(threshold=3000)
 from PIL import Image
 from collections import defaultdict
 import matplotlib.pyplot as plt
@@ -17,7 +18,7 @@ import matplotlib.pyplot as plt
 
 def mock_resp():
     all_resp = list()
-    with open('verify_code_resp.txt') as f:
+    with codecs.open('verify_code_resp.txt', mode='r', encoding='utf-8') as f:
         content = f.readlines()
         for line in content:
             resp = json.loads(line)
@@ -32,30 +33,51 @@ def base64_2_img(base64_string, img_name):
         f.flush()
 
 
-def get_feature(target_img, target_size, division_value):
-    target_image = target_img.resize((50, 50))  # 尺寸归一化
-    # target_imgry = target_image.convert('L')
-    # target_imgry.show()
-    bin_table = target_image.point(lambda x: 1 if x > 90 else 0)
-    target_imgry_array = np.asarray(bin_table)
-    # target_imgry_array = np.asarray(target_imgry)
-    # print target_imgry_array
+def cut_noise(image, threshold):
+    """
+    去掉二值化处理后的图片中的噪声点
+    :param image:
+    :param threshold:
+    :return:
+    """
+    rows, cols = image.size  # 图片的宽度和高度
+    change_pos = []  # 记录噪声点位置
 
-    # 将二维矩阵转为以为特征向量
-    h, w = target_imgry_array.shape
-    data = list()
-    for x in range(0, w/division_value):
-        offset_y = x * division_value
-        temp = list()
-        for y in range(0, h/division_value):
-            offset_x = y * division_value
-            temp.append(sum(sum(target_imgry_array[0+offset_y:division_value+offset_y, 0+offset_x:division_value+offset_x])))
-        data.append(temp)
-    futures_array = np.asarray(data)
-    # print futures_array
-    futures_vector = futures_array.reshape(futures_array.shape[0]*futures_array.shape[1])
-    # print futures_vector
-    return futures_vector
+    # 遍历图片中的每个点，除掉边缘
+    for i in range(1, rows - 1):
+        for j in range(1, cols - 1):
+            # pixel_set用来记录该店附近的黑色像素的数量
+            pixel_set = []
+            # 取该点的邻域为以该点为中心的九宫格
+            for m in range(i - 1, i + 2):
+                for n in range(j - 1, j + 2):
+                    if image.getpixel((m, n)) != 1:  # 1为白色,0位黑色
+                        pixel_set.append(image.getpixel((m, n)))
+
+            # 如果该位置的九宫内的黑色数量小于等于threshold，则判断为噪声
+            if len(pixel_set) <= threshold:
+                change_pos.append((i, j))
+
+    # 对相应位置进行像素修改，将噪声处的像素置为1（白色）
+    for pos in change_pos:
+        image.putpixel(pos, 1)
+
+    return image  # 返回修改后的图片
+
+def get_feature(target_img, target_size, division_value):
+    target_image = target_img.resize(target_size)  # 尺寸归一化
+
+    # 计算出sheild_bin_table.txt
+    # target_imgry = target_image.convert('L')
+    # bin_table = target_imgry.point(lambda x: 1 if x > 120 else 0)
+    # target_imgry_array = np.asarray(bin_table)
+    # print(target_imgry_array)
+
+    target_img_bin = target_image.convert('1')
+    _matrix_data = np.matrix(target_img_bin, dtype='int')  # 二值图转为50 x 50的矩阵
+
+    return _matrix_data
+
 
 
 def hist_similar(target_h, test_h):
@@ -85,6 +107,34 @@ def difference(hist1,hist2):
        else:
            sum1 += 1 - float(abs(hist1[i] - hist2[i]))/ max(hist1[i], hist2[i])
     return sum1/len(hist1)
+
+
+def euclidean_sim(model, target):
+    """
+    求两矩阵的欧式距离
+    :param model:
+    :param target:
+    :return:
+    """
+    dist = np.linalg.norm(model, target, ord=np.inf)
+    sim = 1.0 / (1.0 + dist)
+    return sim
+
+
+def cos_sim(vector_a, vector_b):
+    """
+    计算两个向量之间的余弦相似度
+    :param vector_a: 向量 a
+    :param vector_b: 向量 b
+    :return: sim
+    """
+    vector_a = np.mat(vector_a)
+    vector_b = np.mat(vector_b)
+    num = float(vector_a.T * vector_b)
+    denom = np.linalg.norm(vector_a) * np.linalg.norm(vector_b)
+    cos = num / denom
+    sim = 0.5 + 0.5 * cos
+    return sim
 
 
 def is_pixel_equal(target_img, background_img, x, y):
@@ -166,15 +216,15 @@ class CalcSlideValue(object):
         for _y in range(0, self.height, self.offset):
             for _x in range(0, self.width, self.offset):
                 for each_crop in self.crop_array:
-                    k = each_crop.keys()[0]
-                    v = each_crop.values()[0]
+                    k = list(each_crop.keys())[0]
+                    v = list(each_crop.values())[0]
                     sp_k = [int(s) for s in k.split('_')]
                     if _x == sp_k[0] and _y == sp_k[1]:
                         real_whole_img.paste(v, (_x, _y))
         real_whole_img.save('real_whole_img.jpg')
 
-    def calc_x_distance(self):
-        target_image = Image.open('target.png')
+    def calc_x_distance_by_histogram(self):
+        target_image = Image.open('target.jpg')
         # target_sheild_vector = get_feature(target_imgry, (50, 50), 5)
         # print target_sheild_vector
         bg_image = Image.open('real_whole_img.jpg')
@@ -195,13 +245,50 @@ class CalcSlideValue(object):
         goal_img.save('temp/{0}_{1}_{2}_{3}.jpg'.format(similar_score, self.img_name, goal_w, goal_h))
         print('图片编号: {} 相似得分: {} 横坐标偏移像素: {} 纵坐标偏移像素: {} 共计扫描次数: {}'.format(self.img_name, similar_score, goal_w, goal_h, len(all_diff_list)))
 
+    def calc_x_distance_by_vector(self):
+        # 计算出sheild_bin_table.txt
+        # target_image = Image.open('target.jpg')
+        # target_imgry = target_image.convert('L')
+        # target_sheild_vector = get_feature(target_imgry, (50, 50), 5)
+        # print(target_sheild_vector)
+
+        # 加载sheild_bin_table模型
+        sheild_matrix = np.loadtxt('sheild_bin_table.txt', dtype=int)
+
+        bg_image = Image.open('real_whole_img.jpg')
+
+        all_diff_list = defaultdict(list)
+        for h in range(0, self.height, 1):
+            for w in range(0, self.width, 1):
+                if w > self.width - 50 or h > self.height - 50:  # 此处有bug，无法扫描的最后一行
+                    continue
+                box = w, h, (w + 50), (h + 50)
+                each_region = bg_image.crop(box)
+                _target_matrix = get_feature(each_region, (50, 50), 5)
+                print(_target_matrix)
+                break
+                # print(euclidean_sim(sheild_matrix, _target_matrix))
+                # diff_value = cos_sim(tezhengxiangliang(sheild_matrix), tezhengxiangliang(_target_matrix))
+                # print(diff_value)
+                # if ((sheild_matrix-_target_matrix).all()):
+                #     print(box)
+                #     each_region.show()
+        #         diff_value = difference(target_image.convert('RGB').histogram(), each_region.convert('RGB').histogram())
+        #         all_diff_list[diff_value].append(each_region)
+        #         all_diff_list[diff_value].append([w, h])
+        # similar_score = max(all_diff_list.keys())
+        # similar_value = all_diff_list[similar_score]
+        # goal_img, goal_w, goal_h = similar_value[0], similar_value[1][0], similar_value[1][1]
+        # goal_img.save('temp/{0}_{1}_{2}_{3}.jpg'.format(similar_score, self.img_name, goal_w, goal_h))
+        # print('图片编号: {} 相似得分: {} 横坐标偏移像素: {} 纵坐标偏移像素: {} 共计扫描次数: {}'.format(self.img_name, similar_score, goal_w, goal_h, len(all_diff_list)))
 
 
 if __name__ == '__main__':
     for num, each in enumerate(mock_resp()):
-        print(num)
         csv = CalcSlideValue()
         csv.handle_resp(each)
         csv.crop_img()
         csv.rebuild_img()
-        csv.calc_x_distance()
+        # csv.calc_x_distance_by_histogram()
+        csv.calc_x_distance_by_vector()
+        break

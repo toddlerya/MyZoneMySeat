@@ -1,7 +1,6 @@
 .idea/
 logs/*
 sec.py
-*.jpg
 *.pyc
 reserve_seat.py
 nohup.out

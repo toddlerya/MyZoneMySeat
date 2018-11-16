@@ -18,12 +18,10 @@ headers = {
             "User-Agent": 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36',
         }
 
-
-with codecs.open('test_data/verify_code_resp.txt', 'a+', 'utf-8') as f:
+with codecs.open('../verify_img_code/verify_code_resp.txt', 'w+', 'utf-8') as f:
     all_json = list()
-    for i in range(8):
+    for i in range(10):
         resp = requests.get(test_url, headers=headers)
-        _json = resp.json()
-        print(_json)
-        json.dump(_json, f)
+        _text = resp.text
+        f.write(_text)
         f.write('\n')
