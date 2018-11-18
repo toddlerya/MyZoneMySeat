@@ -19,6 +19,7 @@ from urllib3.util.retry import Retry
 from hlju_lib_config import *
 from sec import username, password
 from verify_captcha import verify
+from slide_verify_captcha import do_slide_verify_captcha
 from db import SeatDB
 from base_lib import Logger, my_log_file
 from send_mail import mail
@@ -88,83 +89,30 @@ class HljuLibrarySeat(object):
 
     def download_captcha(self):
         is_down_ok = False
+        json_data = dict()
         try:
-            if captcha_url:
-                out_img = open("captcha.jpg", "wb")
-                img_resp = self.s.get(captcha_url, headers=self.headers)
+            if slide_captcha_url:
+                img_resp = self.s.get(slide_captcha_url, headers=self.headers)
                 if img_resp.status_code != 200:
-                    self.log.logger.error("captcha_url http_code is %d" % img_resp.status_code)
-                img = img_resp.content
-                if img == '系统维护中，请稍候访问':
-                    self.log.logger.warning("系统维护中，请稍候访问!")
-                    sys.exit()
-                out_img.write(img)
-                out_img.flush()
-                out_img.close()
-                self.log.logger.info("验证码保存成功.")
-                is_down_ok = True
+                    self.log.logger.error("slide_captcha_url http_code is %d" % img_resp.status_code)
+                try:
+                    json_data = img_resp.json()
+                except Exception as err:
+                    self.log.logger.error('获取slide_captcha_url的json数据失败: {}'.format(err))
+                    text_data = img_resp.content
+                    if text_data == '系统维护中，请稍候访问':
+                        self.log.logger.warning("系统维护中，请稍候访问!")
+                        sys.exit()
+                else:
+                    self.log.logger.info("验证码数据获取成功.")
+                    is_down_ok = True
             else:
-                self.log.logger.error("captcha_url is NULL")
+                self.log.logger.error("slide_captcha_url is NULL")
         except Exception as err:
-            self.log.logger.error("save captcha error: %s", err)
+            self.log.logger.error("get slide_captcha error: %s", err)
             is_down_ok = False
-        return is_down_ok
+        return is_down_ok, json_data
 
-    # def get_free_book_info(self, hour='null', start_min='null', end_min='null', offset=0, power='null', window='null',
-    #                        timeout=5.0):
-    #     """
-    #     查询预定座位信息
-    #     :param hour:
-    #     :param start_min:
-    #     :param end_min:
-    #     :param offset:
-    #     :param power:
-    #     :param window:
-    #     :param timeout:
-    #     :return:
-    #     """
-    #     # 查询预定明天的座位信息
-    #     all_free_seat = dict()
-    #     free_book_form = {
-    #         'onDate': self.tomorrow_date,
-    #         'building': '1',  # 1-老馆
-    #         'room': '28',  # 三楼原电阅室-预约
-    #         'hour': hour,  # 14h
-    #         'startMin': start_min,
-    #         'endMin': end_min,
-    #         'power': power,
-    #         'window': window,
-    #         'offset': offset
-    #     }
-    #
-    #     print('[+] 开始查询空座...')
-    #     resp = self.s.get(url=free_book_query_url, data=free_book_form, headers=self.headers, timeout=timeout)
-    #     seat_json = resp.json()
-    #     seat_num = seat_json['seatNum']
-    #     seat_str = seat_json['seatStr']
-    #     free_seat_reg = '''//ul[@class="item"]/li[@class="free"]'''
-    #     # free_seat_reg = '''//ul[@class="item"]/li[@class="using"]'''
-    #     root = etree.HTML(seat_str)
-    #     seats_eles = root.xpath(free_seat_reg)
-    #     print('[+] 当前可选座位共: %s个' % seat_num)
-    #     for __seat in seats_eles:
-    #         raw_seat_id = __seat.get('id')
-    #         try:
-    #             _seat_id = raw_seat_id.split('_')[1]
-    #         except Exception as err:
-    #             print('[-] ERROR: 分割座位ID错误, MSG: %s', err)
-    #             sys.exit()
-    #         seat_title = __seat.get('title')
-    #         seat_num = __seat.xpath('dl/dt')[0].text
-    #         all_free_seat[_seat_id] = [seat_num, seat_title]
-    #     free_seat_count = len(all_free_seat)
-    #     print('[+] 当前空闲座位共: %d个' % free_seat_count)  # {'32362': ['005', '正在使用中'], '27512': ['016', '正在使用中']}
-    #     if free_seat_count > 0:
-    #         print('[+] 有可预约空座, 开始预约!')
-    #         return True, all_free_seat
-    #     else:
-    #         print('[!] 无可预约空座, 早起吧骚年!')
-    #         return False, all_free_seat
 
     def get_book_token(self):
         try:
@@ -295,16 +243,29 @@ def captcha_verify(session_obj, threshold: int = 100):
             "Cookie": session_obj.ck
         }
 
-        if session_obj.download_captcha():
-            flag, res_captcha = verify('captcha.jpg')
-            if flag:
-                return True, res_captcha
+        download_status, captcha_json = session_obj.download_captcha()
+        if download_status:
+            code, _, x_value, _ = do_slide_verify_captcha(captcha_json)
+            payload = {
+                'code': code,
+                'xvalue': x_value,
+                'yvalue': 0,
+                'appId': app_id_of_slide_captcha
+            }
+            resp = session_obj.s.post(slide_captcha_url, headers=session_obj.headers, data=payload)
+            if resp.status_code != 200:
+                session_obj.log.logger.error("POST slide_captcha_url http_code is %d" % resp.status_code)
+            resp_json = resp.json()
+            slide_status = resp_json['status']
+            auth_id = resp_json['data']['authId']
+            if slide_status == 1:
+                return True, auth_id
             else:
                 # 清空cookies, 下载新验证码
                 session_obj.s.cookies.clear()
         else:
             session_obj.log.logger.error('ERROR: 下载验证码失败, 请检查系统是否可以正常访问!')
-    return False, ''
+    return False, '', ''
 
 
 def auto_login(session_obj, username, password, threshold: int = 100):
@@ -317,20 +278,23 @@ def auto_login(session_obj, username, password, threshold: int = 100):
     :return:
     """
     captcha_verify_threshold = 500
-    status_verify, res_verify = captcha_verify(session_obj, captcha_verify_threshold)
+    status_verify, auth_id = captcha_verify(session_obj, captcha_verify_threshold)
     if not status_verify:
         h.log.logger.warning('识别验证码{}次未获得合法验证码, 退出程序!'.format(captcha_verify_threshold))
         sys.exit()
     else:
-        h.log.logger.info('识别到合法验证码: {}'.format(res_verify))
+        h.log.logger.info('识别到合法验证码: {}'.format(auth_id))
     for i in range(threshold):
         h.log.logger.warning('尝试登陆中, 第{}次...'.format(i + 1))
         post_data = {
-            'SYNCHRONIZER_TOKEN': session_obj.token,
-            'SYNCHRONIZER_URI': '/login',
+            'appId': app_id_of_slide_captcha,
+            'appAuthKey': app_auth_key_of_slide_captcha,
+            'authid': auth_id,
             'username': username,
             'password': password,
-            'captcha': res_verify
+            'SYNCHRONIZER_TOKEN': session_obj.token,
+            'SYNCHRONIZER_URI': '/login'
+
         }
         try:
             resp = session_obj.s.post(url=login_url, data=post_data, headers=session_obj.headers)
