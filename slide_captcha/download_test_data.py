@@ -20,7 +20,7 @@ headers = {
 
 with codecs.open('../verify_img_code/verify_code_resp.txt', 'w+', 'utf-8') as f:
     all_json = list()
-    for i in range(10):
+    for i in range(100):
         resp = requests.get(test_url, headers=headers)
         _text = resp.text
         f.write(_text)

@@ -9,10 +9,12 @@ import json
 import base64
 import codecs
 import numpy as np
+from random import randint
 
 np.set_printoptions(threshold=3000)
 from PIL import Image
 from collections import defaultdict
+from functools import reduce
 import matplotlib.pyplot as plt
 
 
@@ -64,20 +66,59 @@ def cut_noise(image, threshold):
 
     return image  # 返回修改后的图片
 
-def get_feature(target_img, target_size, division_value):
+
+def get_feature(target_img, target_size):
     target_image = target_img.resize(target_size)  # 尺寸归一化
+    target_image_gray = target_image.convert('L')
 
     # 计算出sheild_bin_table.txt
-    # target_imgry = target_image.convert('L')
     # bin_table = target_imgry.point(lambda x: 1 if x > 120 else 0)
     # target_imgry_array = np.asarray(bin_table)
     # print(target_imgry_array)
 
-    target_img_bin = target_image.convert('1')
-    _matrix_data = np.matrix(target_img_bin, dtype='int')  # 二值图转为50 x 50的矩阵
+    # 自适应计算阈值
+    threshold = OTSU_enhance(np.array(target_image_gray))
+    bin_table = target_image_gray.point(lambda x: 1 if x > threshold else 0)
+    target_image_gray_array = np.asarray(bin_table)
+    return target_image_gray_array
 
-    return _matrix_data
 
+def OTSU_enhance(img_gray, th_begin=0, th_end=256, th_step=1):
+    """
+    大津法求阈值
+    http://www.labbookpages.co.uk/software/imgProc/otsuThreshold.html
+    http://www.ruanyifeng.com/blog/2013/03/similar_image_search_part_ii.html
+    https://blog.csdn.net/u012771236/article/details/44975831
+    :param img_gray:
+    :param th_begin:
+    :param th_end:
+    :param th_step:
+    :return:
+    """
+    assert img_gray.ndim == 2, "must input a gray img"
+
+    max_g = 0
+    suitable_th = 0
+    for threshold in range(th_begin, th_end, th_step):
+        bin_img = img_gray > threshold
+        bin_img_inv = img_gray <= threshold
+        fore_pix = np.sum(bin_img)
+        back_pix = np.sum(bin_img_inv)
+        if 0 == fore_pix:
+            break
+        if 0 == back_pix:
+            continue
+
+        w0 = float(fore_pix) / img_gray.size
+        u0 = float(np.sum(img_gray * bin_img)) / fore_pix
+        w1 = float(back_pix) / img_gray.size
+        u1 = float(np.sum(img_gray * bin_img_inv)) / back_pix
+        # intra-class variance
+        g = w0 * w1 * (u0 - u1) * (u0 - u1)
+        if g > max_g:
+            max_g = g
+            suitable_th = threshold
+    return suitable_th
 
 
 def hist_similar(target_h, test_h):
@@ -107,53 +148,6 @@ def difference(hist1,hist2):
        else:
            sum1 += 1 - float(abs(hist1[i] - hist2[i]))/ max(hist1[i], hist2[i])
     return sum1/len(hist1)
-
-
-def euclidean_sim(model, target):
-    """
-    求两矩阵的欧式距离
-    :param model:
-    :param target:
-    :return:
-    """
-    dist = np.linalg.norm(model, target, ord=np.inf)
-    sim = 1.0 / (1.0 + dist)
-    return sim
-
-
-def cos_sim(vector_a, vector_b):
-    """
-    计算两个向量之间的余弦相似度
-    :param vector_a: 向量 a
-    :param vector_b: 向量 b
-    :return: sim
-    """
-    vector_a = np.mat(vector_a)
-    vector_b = np.mat(vector_b)
-    num = float(vector_a.T * vector_b)
-    denom = np.linalg.norm(vector_a) * np.linalg.norm(vector_b)
-    cos = num / denom
-    sim = 0.5 + 0.5 * cos
-    return sim
-
-
-def is_pixel_equal(target_img, background_img, x, y):
-    """
-    判断像素是否相同
-    :param target_img:
-    :param background_img:
-    :param x:
-    :param y:
-    :return:
-    """
-    bg_pixel = background_img.load()[x, y]
-    target_pixel = target_img.load()[x, y]
-    threshold = 60
-    if (abs(target_pixel[0] - bg_pixel[0]) < threshold) and (abs(target_pixel[1] - bg_pixel[1]) < threshold) and (
-            abs(target_pixel[2] - bg_pixel[2]) < threshold):
-        return True
-    else:
-        return False
 
 
 class CalcSlideValue(object):
@@ -254,6 +248,7 @@ class CalcSlideValue(object):
 
         # 加载sheild_bin_table模型
         sheild_matrix = np.loadtxt('sheild_bin_table.txt', dtype=int)
+        sheild_matrix_size = sheild_matrix.size
 
         bg_image = Image.open('real_whole_img.jpg')
 
@@ -264,31 +259,28 @@ class CalcSlideValue(object):
                     continue
                 box = w, h, (w + 50), (h + 50)
                 each_region = bg_image.crop(box)
-                _target_matrix = get_feature(each_region, (50, 50), 5)
-                print(_target_matrix)
-                break
-                # print(euclidean_sim(sheild_matrix, _target_matrix))
-                # diff_value = cos_sim(tezhengxiangliang(sheild_matrix), tezhengxiangliang(_target_matrix))
-                # print(diff_value)
-                # if ((sheild_matrix-_target_matrix).all()):
-                #     print(box)
-                #     each_region.show()
-        #         diff_value = difference(target_image.convert('RGB').histogram(), each_region.convert('RGB').histogram())
-        #         all_diff_list[diff_value].append(each_region)
-        #         all_diff_list[diff_value].append([w, h])
-        # similar_score = max(all_diff_list.keys())
-        # similar_value = all_diff_list[similar_score]
-        # goal_img, goal_w, goal_h = similar_value[0], similar_value[1][0], similar_value[1][1]
-        # goal_img.save('temp/{0}_{1}_{2}_{3}.jpg'.format(similar_score, self.img_name, goal_w, goal_h))
-        # print('图片编号: {} 相似得分: {} 横坐标偏移像素: {} 纵坐标偏移像素: {} 共计扫描次数: {}'.format(self.img_name, similar_score, goal_w, goal_h, len(all_diff_list)))
+                _target_matrix = get_feature(each_region, (50, 50))
+                similar_value = ((sheild_matrix == _target_matrix).sum())
+                all_diff_list[similar_value].append(each_region)
+                all_diff_list[similar_value].append([w, h])
+        similar_score = max(list(all_diff_list.keys()))
+        similar_value = all_diff_list[similar_score]
+        goal_img, goal_w, goal_h = similar_value[0], similar_value[1][0], similar_value[1][1]
+        goal_img.save('temp/{0}_{1}_{2}_{3}.jpg'.format(similar_score, self.img_name, goal_w, goal_h))
+        print(
+            '图片编号: {} 相似得分: {} 横坐标偏移像素: {} 纵坐标偏移像素: {} 共计扫描次数: {}'.format(self.img_name, similar_score, goal_w, goal_h,
+                                                                          len(all_diff_list)))
 
 
 if __name__ == '__main__':
     for num, each in enumerate(mock_resp()):
+        print(num)
         csv = CalcSlideValue()
         csv.handle_resp(each)
         csv.crop_img()
         csv.rebuild_img()
         # csv.calc_x_distance_by_histogram()
         csv.calc_x_distance_by_vector()
-        break
+        # break
+
+    # http://www.ruanyifeng.com/blog/2013/03/similar_image_search_part_ii.html
