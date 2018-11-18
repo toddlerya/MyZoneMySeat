@@ -246,6 +246,7 @@ def captcha_verify(session_obj, threshold: int = 100):
         download_status, captcha_json = session_obj.download_captcha()
         if download_status:
             code, _, x_value, _ = do_slide_verify_captcha(captcha_json)
+            session_obj.log.logger.info('识别滑动验证码结果: {}, {}'.format(code, x_value))
             payload = {
                 'code': code,
                 'xvalue': x_value,
@@ -256,6 +257,7 @@ def captcha_verify(session_obj, threshold: int = 100):
             if resp.status_code != 200:
                 session_obj.log.logger.error("POST slide_captcha_url http_code is %d" % resp.status_code)
             resp_json = resp.json()
+            print(resp_json)
             slide_status = resp_json['status']
             auth_id = resp_json['data']['authId']
             if slide_status == 1:
