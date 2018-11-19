@@ -253,6 +253,7 @@ class CalcSlideValue(object):
         bg_image = Image.open('real_whole_img.jpg')
 
         all_diff_list = defaultdict(list)
+        count = 0
         for h in range(0, self.height, 1):
             for w in range(0, self.width, 1):
                 if w > self.width - 50 or h > self.height - 50:  # 此处有bug，无法扫描的最后一行
@@ -263,13 +264,14 @@ class CalcSlideValue(object):
                 similar_value = ((sheild_matrix == _target_matrix).sum())
                 all_diff_list[similar_value].append(each_region)
                 all_diff_list[similar_value].append([w, h])
+                count += 1
         similar_score = max(list(all_diff_list.keys()))
         similar_value = all_diff_list[similar_score]
         goal_img, goal_w, goal_h = similar_value[0], similar_value[1][0], similar_value[1][1]
         goal_img.save('temp/{0}_{1}_{2}_{3}.jpg'.format(similar_score, self.img_name, goal_w, goal_h))
         print(
             '图片编号: {} 相似得分: {} 横坐标偏移像素: {} 纵坐标偏移像素: {} 共计扫描次数: {}'.format(self.img_name, similar_score, goal_w, goal_h,
-                                                                          len(all_diff_list)))
+                                                                          count))
 
 
 if __name__ == '__main__':
