@@ -188,11 +188,13 @@ class CalcSlideValue(object):
 
         # 加载sheild_bin_table模型
         sheild_matrix = np.loadtxt('sheild_bin_table.txt', dtype=int)
-        sheild_matrix_size = sheild_matrix.size
+        # sheild_matrix_size = sheild_matrix.size
 
         bg_image = Image.open('real_whole_img.jpg')
 
-        all_diff_list = defaultdict(list)
+        similar_dict = dict()
+        max_similar_value = 0
+        count = 0
         for h in range(0, self.height, 1):
             for w in range(0, self.width, 1):
                 if w > self.width - 50 or h > self.height - 50:  # 此处有bug，无法扫描的最后一行
@@ -201,15 +203,18 @@ class CalcSlideValue(object):
                 each_region = bg_image.crop(box)
                 _target_matrix = get_feature(each_region, (50, 50))
                 similar_value = ((sheild_matrix == _target_matrix).sum())
-                all_diff_list[similar_value].append(each_region)
-                all_diff_list[similar_value].append([w, h])
-        similar_score = max(list(all_diff_list.keys()))
-        similar_value = all_diff_list[similar_score]
-        goal_img, goal_w, goal_h = similar_value[0], similar_value[1][0], similar_value[1][1]
+                if similar_value >= max_similar_value:
+                    max_similar_value = similar_value
+                    similar_dict = dict()
+                    similar_dict[max_similar_value] = [each_region, w, h]
+                count += 1
+        similar_score = list(similar_dict.keys())[0]
+        similar_data = list(similar_dict.values())
+        goal_img, goal_w, goal_h = similar_data[0][0], similar_data[0][1], similar_data[0][2]
         goal_img.save('temp/{0}_{1}_{2}_{3}.jpg'.format(similar_score, self.img_name, goal_w, goal_h))
         print(
             '图片编号: {} 相似得分: {} 横坐标偏移像素: {} 纵坐标偏移像素: {} 共计扫描次数: {}'.format(self.img_name, similar_score, goal_w, goal_h,
-                                                                          len(all_diff_list)))
+                                                                          count))
         return self.img_name, similar_score, goal_w, goal_h
 
 
