@@ -4,3 +4,5 @@ sec.py
 *.pyc
 reserve_seat.py
 nohup.out
+
+*.jpg
