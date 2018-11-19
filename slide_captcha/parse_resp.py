@@ -14,8 +14,8 @@ from random import randint
 np.set_printoptions(threshold=3000)
 from PIL import Image
 from collections import defaultdict
-from functools import reduce
-import matplotlib.pyplot as plt
+
+from base_lib import re_joint_dir_by_os
 
 
 def mock_resp():
@@ -277,7 +277,8 @@ class CalcSlideValue(object):
         similar_data = list(similar_dict.values())
         # goal_img, goal_w, goal_h = similar_value[0], similar_value[1][0], similar_value[1][1]
         goal_img, goal_w, goal_h = similar_data[0][0], similar_data[0][1], similar_data[0][2]
-        goal_img.save('temp/{0}_{1}_{2}_{3}.jpg'.format(similar_score, self.img_name, goal_w, goal_h))
+        temp_image_name = re_joint_dir_by_os('temp|{0}_{1}_{2}_{3}.jpg'.format(similar_score, self.img_name, goal_w, goal_h))
+        goal_img.save(temp_image_name)
         print(
             '图片编号: {} 相似得分: {} 横坐标偏移像素: {} 纵坐标偏移像素: {} 共计扫描次数: {}'.format(self.img_name, similar_score, goal_w, goal_h,
                                                                           count))

@@ -16,6 +16,7 @@ from collections import defaultdict
 from functools import reduce
 import matplotlib.pyplot as plt
 
+from base_lib import re_joint_dir_by_os
 
 def base64_2_img(base64_string, img_name):
     img_data = base64.b64decode(base64_string)
@@ -211,7 +212,8 @@ class CalcSlideValue(object):
         similar_score = list(similar_dict.keys())[0]
         similar_data = list(similar_dict.values())
         goal_img, goal_w, goal_h = similar_data[0][0], similar_data[0][1], similar_data[0][2]
-        goal_img.save('temp/{0}_{1}_{2}_{3}.jpg'.format(similar_score, self.img_name, goal_w, goal_h))
+        temp_image_name = re_joint_dir_by_os('temp|{0}_{1}_{2}_{3}.jpg'.format(similar_score, self.img_name, goal_w, goal_h))
+        goal_img.save(temp_image_name)
         print(
             '图片编号: {} 相似得分: {} 横坐标偏移像素: {} 纵坐标偏移像素: {} 共计扫描次数: {}'.format(self.img_name, similar_score, goal_w, goal_h,
                                                                           count))
