@@ -253,11 +253,10 @@ def captcha_verify(session_obj, threshold: int = 100):
                 'yvalue': 0,
                 'appId': app_id_of_slide_captcha
             }
-            resp = session_obj.s.post(slide_captcha_url, headers=session_obj.headers, data=payload)
+            resp = session_obj.s.post(verify_slide_captcha_url, headers=session_obj.headers, data=payload)
             if resp.status_code != 200:
                 session_obj.log.logger.error("POST slide_captcha_url http_code is %d" % resp.status_code)
             resp_json = resp.json()
-            print(resp_json)
             slide_status = resp_json['status']
             auth_id = resp_json['data']['authId']
             if slide_status == 1:
