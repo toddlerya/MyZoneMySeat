@@ -9,6 +9,12 @@ index_url = "http://seat1.lib.hlju.edu.cn/login?targetUri=%2F"
 login_url = "http://seat1.lib.hlju.edu.cn/auth/signIn"
 captcha_url = 'http://seat1.lib.hlju.edu.cn/simpleCaptcha/captcha'
 
+slide_captcha_url = 'http://seat1.lib.hlju.edu.cn:28088/verifycode'
+verify_slide_captcha_url = 'http://seat1.lib.hlju.edu.cn:28088/verify'
+
+app_id_of_slide_captcha = 'a3a5c1faff9e41c2b2447a52c5bd7ea0'
+app_auth_key_of_slide_captcha = 'a109981dd38540d5b20b4af760d7f6f1'
+
 # 查询空座
 free_book_query_url = 'http://seat1.lib.hlju.edu.cn/freeBook/ajaxSearch'
 
