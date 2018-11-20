@@ -16,6 +16,7 @@ from random import choice
 from lxml import etree
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
 from hlju_lib_config import *
 from sec import username, password
 from verify_captcha import verify
