@@ -1,22 +1,18 @@
 #!/usr/bin/env python
 # coding: utf-8
-# @Time     : 2018/11/15 9:16  
+# @Time     : 2018/11/15 9:16
 # @Author   : toddlerya
 # @FileName : parse_resp.py
 # @Project  : test
 
-import json
 import base64
-import codecs
 import numpy as np
-
-np.set_printoptions(threshold=3000)
 from PIL import Image
 from collections import defaultdict
 from functools import reduce
-import matplotlib.pyplot as plt
 
 from base_lib import re_joint_dir_by_os
+
 
 def base64_2_img(base64_string, img_name):
     img_data = base64.b64decode(base64_string)
